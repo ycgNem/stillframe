@@ -4,7 +4,7 @@ Running notes for whoever (human or AI session) picks this up next. Newest statu
 
 ## Status
 
-**2026-10-22 (late) — M8–M12 built: chapters 2–5, the Gauntlet, new type and UI. Not pushed.**
+**2026-10-22 (late) — M8–M12 built: chapters 2–5, the Gauntlet, new type and UI. Live.**
 
 - **Asked for:** finish the remaining milestones, and redo the text and UI to be clearer to read, "the
   opposite of Last Watt", like Fins & Fronds and Foldworks.
@@ -29,11 +29,12 @@ Running notes for whoever (human or AI session) picks this up next. Newest statu
   pass (`scripts/economy.ts`). Level tuning: `node scripts/run.mjs scripts/dev/botcheck.ts <chapter>`.
 - **Review:** `critique/2026-10-22-chapters.md` is Claude's own pass over the new content (12 issues
   found and fixed), not fresh eyes.
-- **Not done:** nothing is committed or pushed, so the live site is still the MVP. M7's human playtest
-  box and M12's critic and "live" boxes stay open.
-- **Next:** commit and push to deploy (it tests and builds on the way); a fresh-eyes critic pass or a
-  human playtest of chapters 2–5 and the Gauntlet; tighten 1-8's par after a human clear; listen to
-  the new sounds.
+- **Live:** commit 9f28e88 pushed to `main`; Actions run 39840611990 green (build, deploy).
+  `node e2e/clear.mjs https://ycgnem.github.io/stillframe/ 2-2` clears a Chapter 2 level on the live
+  site through replay, tally and save.
+- **Not done:** M7's human playtest box and M12's critic-pass box stay open.
+- **Next:** a fresh-eyes critic pass (the `indie-critic` agent) or a human playtest of chapters 2–5 and
+  the Gauntlet; tighten 1-8's par after a human clear; listen to the new sounds.
 
 **2026-10-22 (night) — Live at https://ycgnem.github.io/stillframe/; first critic pass done.**
 

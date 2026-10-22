@@ -231,8 +231,9 @@ Follows [STYLE.md](STYLE.md) and [ART_BUDGET.md](ART_BUDGET.md).
       critical and major issues fixed, see the decisions log. Pass 2 (`critique/2026-10-22-chapters.md`)
       was Claude's own review of chapters 2–5, not fresh eyes: still wanted, an independent pass or a
       human on the new chapters.)*
-- [ ] Patch notes, README, live. *(`docs/PATCH_NOTES.md` and the README are written; not live until
-      this is pushed to `main`.)*
+- [x] Patch notes, README, live. *(`docs/PATCH_NOTES.md`, README; commit 9f28e88, Actions run
+      39840611990 green; `node e2e/clear.mjs https://ycgnem.github.io/stillframe/ 2-2` clears on the
+      live site.)*
 
 ### Stretch
 Daily seeded Gauntlet · replay GIF export · best-replay gallery · level editor · controller support ·
