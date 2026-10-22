@@ -19,6 +19,19 @@ Running notes for whoever (human or AI session) picks this up next. Newest statu
   UI are drawn in code (`src/render/level.ts`, `font.ts`). **PixelLab: still 0 / 100.**
 - **Playtest note (M1), by Claude, not a human:** see below. What a human still has to judge: whether
   Chapter 1 takes 20–40 minutes for a fresh player (M7's last box), and the sound by ear.
+- **Playtest note (M1), Claude driving the real game through Playwright at 1280×720, ~15 minutes
+  across 1-1, 1-2 and 1-4, plus every level under `app.autoplay`:**
+  - Still versus moving reads at once: the cyan TIME bar drops to a stub, the drone drops and slows,
+    bullets hang as short streaks with their heads lit, shards freeze mid-air. 3% idle feels right: the
+    room is never fully dead (reds creep about 1 px a second), which keeps "standing still" honest. Kept.
+  - The action burst (0.18 s) is enough to see your own bullet leave the gun and travel ~40 px, then
+    it crawls with everything else: you get to watch it land. Good.
+  - Problems found and fixed: the HUD plates hid the player in the top-left corner of 1-2 (plates now
+    step aside for the player and reds); a 1-tile pickup reach meant standing on top of a gun to
+    click it (now 1.25 tiles, Reach I/II 1.6/2.1); it was hard to see that a desk would eat your shot
+    (a faint dotted line now runs from your gun to the cursor, stopping where the bullet would).
+  - 1-4 punishes walking into the open: three gunners converge. That is the intended lesson, but it
+    is the first real difficulty spike; watch for it in a human playtest.
 - **Known weak spots:** characters are mannequins with few frames (no turn animation, no punch
   follow-through on the far arm); the chapter map is a plain floor plan; the bot is good at aiming and
   bad at dodging bullets, so par times were set from its times with generous slack.

@@ -38,7 +38,7 @@ export class Input {
     addEventListener('wheel', (e) => {
       if (e.deltaY) this.presses.add(e.deltaY > 0 ? 'WheelDown' : 'WheelUp');
     }, { passive: true });
-    target.addEventListener('contextmenu', (e) => e.preventDefault());
+    addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   down(code: string) {
