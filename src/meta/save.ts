@@ -15,6 +15,20 @@ export interface LevelRecord {
   clears: number;
 }
 
+/** Rebindable keys, as KeyboardEvent.code. The arrow keys always move as well. */
+export interface KeyBinds {
+  up: string;
+  down: string;
+  left: string;
+  right: string;
+  pick: string;
+  swap: string;
+  dash: string;
+  restart: string;
+}
+
+export const DEFAULT_KEYS: KeyBinds = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', pick: 'KeyE', swap: 'KeyQ', dash: 'Space', restart: 'KeyR' };
+
 export interface Settings {
   /** 0..1 */
   sfx: number;
@@ -22,8 +36,11 @@ export interface Settings {
   shake: boolean;
   /** the "STILL. FRAME." voice */
   voice: boolean;
-  /** fewer white flashes */
+  /** fewer white flashes (and a gentler strobe) */
   flash: boolean;
+  /** reds get a thick ink outline, for anyone who finds red on white hard to pick out */
+  outline: boolean;
+  keys: KeyBinds;
 }
 
 export interface Save {
@@ -42,6 +59,8 @@ export interface Save {
   deaths: number;
   /** real seconds spent in levels */
   played: number;
+  /** the Gauntlet: the furthest wave cleared, and how many runs */
+  gauntlet: { best: number; runs: number };
 }
 
 export function newSave(): Save {
@@ -49,8 +68,8 @@ export function newSave(): Save {
     v: SAVE_VERSION, coins: 0, earned: 0, levels: {},
     up: { stride: 0, trigger: 0, shield: 0, frameskip: 0, rewind: 0, arm: 0, mag: 0, reach: 0 },
     holster: false, owned: [], loadout: null,
-    settings: { sfx: 0.8, music: 0.6, shake: true, voice: true, flash: false },
-    deaths: 0, played: 0,
+    settings: { sfx: 0.8, music: 0.6, shake: true, voice: true, flash: false, outline: false, keys: { ...DEFAULT_KEYS } },
+    deaths: 0, played: 0, gauntlet: { best: 0, runs: 0 },
   };
 }
 
@@ -64,6 +83,7 @@ export function migrate(raw: unknown): Save {
   s.earned = Math.max(s.coins, Math.floor(num(r.earned, s.coins)));
   s.deaths = Math.floor(num(r.deaths, 0));
   s.played = num(r.played, 0);
+  if (r.gauntlet && typeof r.gauntlet === 'object') s.gauntlet = { best: Math.max(0, Math.floor(num(r.gauntlet.best, 0))), runs: Math.max(0, Math.floor(num(r.gauntlet.runs, 0))) };
   if (r.levels && typeof r.levels === 'object') {
     for (const l of LEVELS) {
       const rec = (r.levels as Record<string, LevelRecord>)[l.id];
@@ -84,7 +104,15 @@ export function migrate(raw: unknown): Save {
       shake: t.shake ?? s.settings.shake,
       voice: t.voice ?? s.settings.voice,
       flash: t.flash ?? s.settings.flash,
+      outline: !!t.outline,
+      keys: { ...DEFAULT_KEYS },
     };
+    if (t.keys && typeof t.keys === 'object') {
+      for (const k of Object.keys(DEFAULT_KEYS) as (keyof KeyBinds)[]) {
+        const v = (t.keys as Partial<KeyBinds>)[k];
+        if (typeof v === 'string' && v) s.settings.keys[k] = v;
+      }
+    }
   }
   return s;
 }
@@ -95,6 +123,11 @@ export function record(s: Save, id: string): LevelRecord {
 
 export function starCount(s: Save): number {
   return Object.values(s.levels).reduce((n, r) => n + r.stars.filter(Boolean).length, 0);
+}
+
+/** Gauntlet opens once Chapter 2's boss has fallen. */
+export function gauntletOpen(s: Save): boolean {
+  return record(s, '2-8').clears > 0;
 }
 
 /** Levels unlock in order: the first is open, each next one once the one before is cleared. */

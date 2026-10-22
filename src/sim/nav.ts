@@ -1,7 +1,7 @@
 // Reds find you with a flow field: a breadth-first search over walkable cells from the player's cell,
 // rebuilt when you change cell or a tile changes. Rooms are tiny, so this is cheap. Moving diagonally
 // may not cut a corner.
-import { cellCenter, cellIndex, solidFor, tileAt } from './grid';
+import { cellCenter, cellIndex, hotCell, solidFor, tileAt } from './grid';
 import type { World } from './types';
 
 const DIRS = [
@@ -22,7 +22,7 @@ export function bfs(w: World, start: number): number[] {
       const nx = cx + dx, ny = cy + dy;
       if (nx < 0 || ny < 0 || nx >= w.cols || ny >= w.rows) continue;
       const ni = ny * w.cols + nx;
-      if (dist[ni] >= 0 || solidFor(tileAt(w, nx, ny), 'red')) continue;
+      if (dist[ni] >= 0 || solidFor(tileAt(w, nx, ny), 'red') || hotCell(w, nx, ny)) continue;
       if (dx && dy && (solidFor(tileAt(w, cx + dx, cy), 'red') || solidFor(tileAt(w, cx, cy + dy), 'red'))) continue;
       dist[ni] = dist[c] + 1;
       queue.push(ni);
@@ -34,9 +34,10 @@ export function bfs(w: World, start: number): number[] {
 /** Rebuilds the field if the player changed cell or a tile changed. */
 export function updateFlow(w: World) {
   const at = cellIndex(w, w.player.x, w.player.y);
-  if (at === w.flowAt && w.flowVersion === w.tilesVersion) return;
+  if (at === w.flowAt && w.flowVersion === w.tilesVersion && w.flowHazard === w.hazardVersion) return;
   w.flowAt = at;
   w.flowVersion = w.tilesVersion;
+  w.flowHazard = w.hazardVersion;
   w.flow = bfs(w, at);
 }
 

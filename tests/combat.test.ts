@@ -348,7 +348,7 @@ describe('goals and waves', () => {
 describe('critic pass 1', () => {
   const SURVIVE = { goal: { kind: 'survive' as const, seconds: 99 } };
   const bullet = (w: World, o: Partial<Bullet>): Bullet => ({
-    id: w.nextId++, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, from: 'player', owner: 0, life: 300, damage: 3, hit: false, ...o,
+    id: w.nextId++, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, from: 'player', owner: 0, life: 300, damage: 3, hit: false, pierce: false, bounced: false, ...o,
   });
 
   it('only a red bullet already in flight when you fired can be parried; shots traded at once pass', () => {

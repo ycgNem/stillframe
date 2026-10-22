@@ -1,5 +1,7 @@
 // Wires the pieces: input → the current screen → (in a level) time rule → sim ticks → render. Screens
 // are small classes; the one loop asks the current screen how fast game time runs, ticks it, and draws.
+// Screens paint the world on `display.world` (320×180 game pixels) and text and menus on `ui`
+// (640×360 UI pixels); the app draws the pointer and presents both layers.
 import { Sound } from '../audio/audio';
 import { PAL } from '../data/palette';
 import { TICK_RATE } from '../data/tuning';
@@ -10,7 +12,7 @@ import { modsOf, type Save } from '../meta/save';
 import { Atlas, type SheetJson } from '../render/atlas';
 import { rect } from '../render/prims';
 import { VIEW } from '../render/view';
-import { Ui } from '../ui/kit';
+import { paint, Ui, UI } from '../ui/kit';
 import { loadSave, writeSave } from './storage';
 import { ContactScreen } from './contact';
 import { EndScreen } from './end';
@@ -50,11 +52,11 @@ export class App {
   now = 0;
 
   constructor(canvas: HTMLCanvasElement, sheetUrl: string, sheet: SheetJson) {
-    this.display = new Display(canvas, VIEW.w, VIEW.h);
+    this.display = new Display(canvas, VIEW.w, VIEW.h, UI.scale);
     this.input = new Input(canvas, (x, y) => this.display.toView(x, y));
     this.input.onGesture = () => this.sound.unlock();
     this.atlas = new Atlas(sheetUrl, sheet);
-    this.ui = new Ui(this.display.ctx, this.input, this.sound);
+    this.ui = new Ui(this.display.ui, this.input, this.sound);
     this.save = loadSave();
     this.applySettings();
     this.screen = new TitleScreen(this);
@@ -68,6 +70,11 @@ export class App {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.screen.blur?.();
     });
+  }
+
+  /** The world layer (game pixels). */
+  get world() {
+    return this.display.world;
   }
 
   goto(s: Screen) {
@@ -104,32 +111,34 @@ export class App {
   private frame(realDt: number, alpha: number) {
     this.now += realDt;
     if (this.input.pressed('F3')) this.debug = !this.debug;
+    this.display.begin();
     this.screen.frame(realDt, alpha);
     this.drawCursor();
+    this.display.present();
     this.input.endFrame();
   }
 
   private drawCursor() {
-    const ctx = this.display.ctx;
-    const m = this.input.mouse;
+    const ctx = this.display.ui;
+    const m = this.ui.mouse;
     const x = Math.round(m.x), y = Math.round(m.y);
     const kind = this.screen.cursor ?? 'pointer';
     if (kind === 'none') return;
     if (kind === 'aim') {
-      // a crosshair with a gap, ink with a paper rim so it reads on white and black
-      for (const [dx, dy, w, h] of [[-5, 0, 3, 1], [3, 0, 3, 1], [0, -5, 1, 3], [0, 3, 1, 3]]) {
-        rect(ctx, x + dx - (w > 1 ? 0 : 1), y + dy - (h > 1 ? 0 : 1), w + (w > 1 ? 0 : 2), h + (h > 1 ? 0 : 2), PAL.paper);
-      }
+      // four ink arms with a paper rim, so it reads on white and black; they turn cyan when a punch would land
       const arms = this.screen.cursorLock ? PAL.tide : PAL.ink;
-      for (const [dx, dy, w, h] of [[-5, 0, 3, 1], [3, 0, 3, 1], [0, -5, 1, 3], [0, 3, 1, 3]]) rect(ctx, x + dx, y + dy, w, h, arms);
-      rect(ctx, x, y, 1, 1, PAL.cyan);
+      const bars: [number, number, number, number][] = [[-11, -1, 7, 2], [5, -1, 7, 2], [-1, -11, 2, 7], [-1, 5, 2, 7]];
+      for (const [dx, dy, w, h] of bars) rect(ctx, x + dx - 1, y + dy - 1, w + 2, h + 2, PAL.paper);
+      for (const [dx, dy, w, h] of bars) rect(ctx, x + dx, y + dy, w, h, arms);
+      rect(ctx, x - 1, y - 1, 2, 2, PAL.cyan);
       return;
     }
-    // an arrow pointer
-    const rows = ['#.......', '##......', '#o#.....', '#oo#....', '#ooo#...', '#oooo#..', '#ooooo#.', '#oo####.', '#o#.....', '##......'];
-    rows.forEach((r, j) => [...r].forEach((c, i) => {
-      if (c === '#') rect(ctx, x + i, y + j, 1, 1, PAL.ink);
-      else if (c === 'o') rect(ctx, x + i, y + j, 1, 1, PAL.paper);
-    }));
+    paint(ctx, POINTER, x, y);
   }
 }
+
+/** The arrow pointer, in UI pixels: ink with a paper face. */
+const POINTER = [
+  'k.........', 'kk........', 'kpk.......', 'kppk......', 'kpppk.....', 'kppppk....', 'kpppppk...', 'kppppppk..',
+  'kpppppppk.', 'kppppkkkkk', 'kppkpk....', 'kpk.kpk...', 'kk..kpk...', 'k....kpk..', '.....kpk..', '......kk..',
+];

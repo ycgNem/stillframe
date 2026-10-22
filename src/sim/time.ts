@@ -2,6 +2,7 @@
 // action (shot, punch, throw, pickup) buys a short burst at full speed. It decides how many sim ticks run
 // per real second; the sim never sees the scale, so a replay can play the same ticks back at real speed.
 // Stride lowers the walking scale (while the sim speeds you up by as much) and Trigger shortens the burst.
+// The inverse glitch (chapter 5) turns the rule over: time runs while you stand still.
 import { TIME } from '../data/tuning';
 import { TIER_VALUES } from '../data/upgrades';
 
@@ -13,15 +14,18 @@ export interface TimeState {
   /** walking scale and burst length after upgrades */
   walk: number;
   burstLen: number;
+  /** the inverse glitch: standing still counts as moving and the other way round */
+  inverse: boolean;
 }
 
-export function createTime(stride = 0, trigger = 0): TimeState {
-  return { scale: TIME.idle, burst: 0, walk: TIME.walk / TIER_VALUES.strideSpeed[stride], burstLen: TIER_VALUES.triggerBurst[trigger] };
+export function createTime(stride = 0, trigger = 0, inverse = false): TimeState {
+  return { scale: TIME.idle, burst: 0, walk: TIME.walk / TIER_VALUES.strideSpeed[stride], burstLen: TIER_VALUES.triggerBurst[trigger], inverse };
 }
 
 /** Once per real frame. `move` is how hard the player is moving, 0..1. Returns the new scale. */
 export function updateTime(t: TimeState, move: number, realDt: number): number {
-  const m = Math.min(1, Math.max(0, move));
+  const held = Math.min(1, Math.max(0, move));
+  const m = t.inverse ? 1 - held : held;
   const walkTarget = TIME.idle + (t.walk - TIME.idle) * m;
   const target = t.burst > 0 ? Math.max(TIME.burstScale, walkTarget) : walkTarget;
   const rate = target > t.scale ? TIME.rampUp : TIME.rampDown;

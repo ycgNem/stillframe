@@ -99,3 +99,26 @@ export const COINS = {
 
 /** Waves: reds come through doors one after another, this far apart, after this pause. */
 export const WAVES = { stagger: 0.45, clearDelay: 0.8, enterTime: 0.55 };
+
+/** Trains (chapter 2): rails light up this long before one comes; cars are this long, with this gap. A red a
+ *  train hits is your kill (+2 style); a train hits you like anything else. */
+export const TRAINS = { warn: 1.6, car: 44, gap: 3, styleKill: 2 };
+
+/** The drop at a roof's edge (chapter 3): a red pushed to within this many px of it goes over. */
+export const LEDGE = { shove: 7, styleKill: 2 };
+
+/** A crane hook kills anything within this many px; a red it hits is your kill. */
+export const HOOK = { radius: 9, styleKill: 2, foremanStun: 0.7, foremanDamage: 1 };
+
+/** The katana: a red cut down pays this on top; a bullet cut out of the air is a parry. */
+export const BLADE = { styleKill: 1 };
+/** how long the katana's arc stays on screen, game s (render only) */
+export const BLADE_FX = { life: 0.18 };
+/** strobe rooms (render only): a flash every `cycle` game s, lit for `lit` of it */
+export const STROBE = { cycle: 0.6, lit: 0.2 };
+
+/** Gravity wells (chapter 5) drag at bodies at this share of their pull on bullets. */
+export const WELLS = { bodyShare: 0.08 };
+
+/** The echo glitch: every shot fires again this long after. */
+export const ECHO = { delay: 0.6 };

@@ -1,26 +1,50 @@
 import { describe, expect, it } from 'vitest';
-import { GLYPHS, GLYPHS7, wrap, textWidth } from '../src/render/font';
+import { PANE, SHARD } from '../src/ui/fonts';
+import { keyWidth, measure, richLines, richWidth, wrap } from '../src/ui/text';
 
-describe('pixel fonts', () => {
-  it('every 3×5 glyph is five rows of three', () => {
-    const bad = Object.entries(GLYPHS).filter(([, g]) => !/^([.#]{3} ){4}[.#]{3}$/.test(g));
-    expect(bad).toEqual([]);
+describe('the two faces', () => {
+  for (const f of [PANE, SHARD]) {
+    it(`${f.name}: every glyph is a rectangle of '.' and '#'`, () => {
+      const bad = Object.entries(f.glyphs).filter(([, g]) => {
+        const rows = g.split('|');
+        return !rows.every((r) => r.length === rows[0].length && /^[.#]+$/.test(r));
+      });
+      expect(bad.map(([k]) => k)).toEqual([]);
+    });
+
+    it(`${f.name}: capitals and figures stand exactly cap-high`, () => {
+      const wrong = [...'ABCDEFGHIJKLMNOPRSTUVWXYZ0123456789'].filter((c) => f.glyphs[c].split('|').length !== f.cap);
+      expect(wrong).toEqual([]);
+    });
+  }
+
+  it('Pane has lowercase that sits on the baseline, descenders 2 below', () => {
+    for (const c of 'abcdefhiklmnorstuvwxz') expect(PANE.glyphs[c].split('|'), c).toHaveLength(PANE.cap);
+    for (const c of 'gjpqy') expect(PANE.glyphs[c].split('|'), c).toHaveLength(PANE.cap + 2);
   });
 
-  it('every 5×7 glyph is seven rows of five', () => {
-    const bad = Object.entries(GLYPHS7).filter(([, g]) => !/^([.#]{5} ){6}[.#]{5}$/.test(g));
-    expect(bad).toEqual([]);
+  it('figures are tabular, so counters do not jitter', () => {
+    for (const f of [PANE, SHARD]) {
+      const widths = new Set([...'0123456789'].map((c) => f.glyphs[c].split('|')[0].length));
+      expect(widths.size, f.name).toBe(1);
+    }
   });
 
-  it('both cover the letters and digits', () => {
-    const all = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
-    expect(all.filter((c) => !(c in GLYPHS))).toEqual([]);
-    expect(all.filter((c) => !(c in GLYPHS7))).toEqual([]);
-  });
-
-  it('wraps text to a width', () => {
-    const lines = wrap('STAND STILL TO THINK. EVERY STEP RUNS THE CLOCK.', 80);
+  it('measures and wraps', () => {
+    expect(measure('A')).toBe(6);
+    expect(measure('AA')).toBe(13);
+    expect(measure('a b')).toBe(6 + 1 + 4 + 1 + 6);
+    const lines = wrap('Stand still to think. Every step runs the clock.', 160);
     expect(lines.length).toBeGreaterThan(1);
-    for (const l of lines) expect(textWidth(l)).toBeLessThanOrEqual(80);
+    for (const l of lines) expect(measure(l)).toBeLessThanOrEqual(160);
+  });
+
+  it('rich text: keycaps and icons take their width and wrap as words', () => {
+    const one = richLines('[Esc] map');
+    expect(one).toHaveLength(1);
+    expect(richWidth(one[0])).toBe(keyWidth('Esc') + PANE.space + PANE.gap + measure('map'));
+    const many = richLines('[W][A][S][D] move. *Time moves only when you do.*', 120);
+    expect(many.length).toBeGreaterThan(1);
+    for (const l of many) expect(richWidth(l)).toBeLessThanOrEqual(120);
   });
 });

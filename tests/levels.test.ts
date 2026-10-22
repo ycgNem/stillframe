@@ -5,10 +5,11 @@ import { ITEM_LETTERS } from '../src/data/items';
 import { LEVELS } from '../src/data/levels';
 import { RED_LETTERS } from '../src/data/reds';
 import { stateHash } from '../src/sim/hash';
+import { PROPS } from '../src/sim/level';
 import { createWorld, step } from '../src/sim/world';
 import { botRun } from './helpers';
 
-const LETTERS = new Set([...' #.,=DEXP', ...'TCSFVOWKHR', ...Object.keys(ITEM_LETTERS), ...Object.keys(RED_LETTERS)]);
+const LETTERS = new Set([...' #.,=DEXP_~:', ...PROPS, ...Object.keys(ITEM_LETTERS), ...Object.keys(RED_LETTERS)]);
 
 describe('level data', () => {
   for (const l of LEVELS) {

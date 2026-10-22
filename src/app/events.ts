@@ -6,7 +6,35 @@ export function playEvent(s: Sound, e: SimEvent, mode: 'player' | 'replay') {
   const v = mode === 'replay' ? 0.6 : 1;
   switch (e.t) {
     case 'shot':
-      s.play(e.from === 'red' ? 'redShot' : e.item === 'shotgun' ? 'shotgun' : 'shot', v);
+      if (e.from === 'red') s.play(e.item === 'rifle' ? 'rifle' : 'redShot', v);
+      else s.play(e.item === 'shotgun' ? 'shotgun' : e.item === 'smg' ? 'smg' : e.item === 'rifle' ? 'rifle' : 'shot', v);
+      break;
+    case 'slash':
+      s.play('slash', v);
+      break;
+    case 'reflect':
+      s.play('reflect', v);
+      break;
+    case 'split':
+      s.play('split', v);
+      break;
+    case 'fall':
+      s.play('fall', v);
+      break;
+    case 'warn':
+      if (mode === 'player') s.play('warn', 0.9);
+      break;
+    case 'train':
+      s.play('train', v);
+      break;
+    case 'land':
+      s.play('land', v);
+      break;
+    case 'beat':
+      s.play('beat', v * (e.n === 0 ? 1 : 0.5));
+      break;
+    case 'drop':
+      s.play('drop', v);
       break;
     case 'punch':
       s.play(e.hit ? 'punch' : 'whiff', v);

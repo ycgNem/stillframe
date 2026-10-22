@@ -3,13 +3,14 @@
 // rest (popups, the dash trail, coins flying to the counter) run on real time so the UI stays alive.
 // Nothing here touches the World.
 import { PAL } from '../data/palette';
-import { COINS } from '../data/tuning';
-import type { RedKind } from '../data/reds';
+import { BLADE_FX, COINS, TILE } from '../data/tuning';
+import { ITEMS } from '../data/items';
+import { REDS, type RedKind } from '../data/reds';
 import { stopsShots, TILE_PROP, tileOfPoint } from '../sim/grid';
 import type { SimEvent, World } from '../sim/types';
 import type { Atlas } from './atlas';
 import { actorSprite } from './actors';
-import { drawOutlined, textWidth } from './font';
+import { text } from '../ui/text';
 import { dither, line, ring, rect, type Ctx } from './prims';
 import { AIR, type Camera } from './view';
 
@@ -23,7 +24,7 @@ interface Shard {
 }
 
 interface Spark {
-  kind: 'flash' | 'punch' | 'puff' | 'ring' | 'dust' | 'deflect' | 'impact';
+  kind: 'flash' | 'punch' | 'puff' | 'ring' | 'dust' | 'deflect' | 'impact' | 'slash' | 'tile' | 'quake';
   x: number; y: number;
   aim: number;
   t: number;
@@ -61,6 +62,8 @@ function jitter() {
 }
 
 const MAX_SHARDS = 4000;
+/** about one resting shard in this many sparkles at a time */
+const SPARKLE_ONE_IN = 160;
 /** shards lower than this bounce off desks and copiers too, not just walls */
 const PROP_HEIGHT = 10;
 const GRAVITY = 420;
@@ -75,6 +78,8 @@ export class Fx {
   arrived = 0;
   /** real seconds of the white flash when a shield breaks */
   flash = 0;
+  /** the dance-floor tiles lit for the next drop, remembered so the drop can flash them */
+  private lit: number[] = [];
 
   constructor(private atlas: Atlas) {}
 
@@ -166,7 +171,7 @@ export class Fx {
         break;
       case 'deflect':
         this.sparks.push({ kind: 'deflect', x: e.x, y: e.y, aim: 0, t: 0, life: 0.2, color: PAL.glint });
-        this.popup('BLOCKED', e.x, e.y - 22, PAL.hot);
+        this.popup('Blocked', e.x, e.y - 22, PAL.blood);
         break;
       case 'glass':
         this.burst(e.x, e.y, 6, 18, [PAL.paper, PAL.fog, PAL.stone, PAL.ash], 0, 60);
@@ -176,7 +181,7 @@ export class Fx {
         break;
       case 'parry':
         this.sparks.push({ kind: 'ring', x: e.x, y: e.y, aim: 0, t: 0, life: 0.25, color: PAL.ink });
-        this.popup(`+${COINS.parry} PARRY`, e.x, e.y - 16, PAL.ink);
+        this.popup(`+${COINS.parry} parry`, e.x, e.y - 16, PAL.ink);
         break;
       case 'shield':
         this.sparks.push({ kind: 'ring', x: e.x, y: e.y, aim: 0, t: 0, life: 0.35, color: PAL.cyan });
@@ -189,9 +194,9 @@ export class Fx {
       case 'shatter':
         this.shatter(e.kind, e.x, e.y, e.aim, w, e.id);
         this.coinBurst(e.x, e.y, Math.min(8, e.coins));
-        if (e.coins > (e.kind === 'manager' ? 25 : e.kind === 'brute' ? 5 : 2)) {
-          const extra = e.cause === 'throw' ? 'THROW' : e.cause === 'dash' ? 'SKIP' : w.combo.count > 1 ? `COMBO X${w.combo.count}` : 'STYLE';
-          this.popup(extra, e.x, e.y - 26, PAL.gold);
+        if (e.coins > (REDS[e.kind].boss ? 25 : REDS[e.kind].tough ? 5 : 2)) {
+          const extra = e.cause === 'throw' ? 'Throw' : e.cause === 'dash' ? 'Skip' : w.combo.count > 1 ? `Combo ×${w.combo.count}` : 'Style';
+          this.popup(extra, e.x, e.y - 26, PAL.amber);
         }
         break;
       case 'death':
@@ -202,6 +207,34 @@ export class Fx {
         break;
       case 'disarm':
         this.sparks.push({ kind: 'puff', x: e.x, y: e.y - 8, aim: 0, t: 0, life: 0.15, color: PAL.ink });
+        break;
+      case 'slash':
+        this.sparks.push({ kind: 'slash', x: e.x, y: e.y, aim: e.aim, t: 0, life: BLADE_FX.life, color: e.from === 'player' ? PAL.ink : PAL.hot });
+        break;
+      case 'reflect':
+        this.sparks.push({ kind: 'ring', x: e.x, y: e.y, aim: 0, t: 0, life: 0.25, color: PAL.glint });
+        this.popup('Reflected', e.x, e.y - 24, PAL.blood);
+        break;
+      case 'split':
+        this.burst(e.x, e.y, 10, 14, [PAL.hot, PAL.red, PAL.glint], 0, 60);
+        break;
+      case 'fall':
+        this.burst(e.x, e.y, 4, 8, [PAL.stone, PAL.ash], 0, 40);
+        if (e.kind === 'foreman') this.popup('Over the edge', e.x, e.y - 30, PAL.amber);
+        break;
+      case 'land':
+        this.sparks.push({ kind: 'quake', x: e.x, y: e.y, aim: 0, t: 0, life: 0.4, color: PAL.ink });
+        this.burst(e.x, e.y, 2, 20, [PAL.stone, PAL.ash, PAL.slate], 0, 90);
+        break;
+      case 'warn':
+        if (e.what === 'beat') this.lit = w.beat.lit.slice();
+        break;
+      case 'drop':
+        for (const i of this.lit) {
+          const x = (i % w.cols) * TILE + TILE / 2, y = Math.floor(i / w.cols) * TILE + TILE / 2;
+          this.sparks.push({ kind: 'tile', x, y, aim: 0, t: 0, life: 0.3, color: PAL.hot });
+        }
+        this.lit = [];
         break;
     }
   }
@@ -295,9 +328,20 @@ export class Fx {
     }
   }
 
-  /** Shards lying on the floor: drawn under everything that stands. */
-  drawFloor(ctx: Ctx, cam: Camera) {
-    for (const s of this.shards) if (s.rest) rect(ctx, s.x - cam.x, s.y - cam.y, s.s, s.s, s.c);
+  /** Shards lying on the floor: drawn under everything that stands. Now and then one catches the light:
+   *  a few at a time, a different few every quarter of a real second. */
+  drawFloor(ctx: Ctx, cam: Camera, now = 0) {
+    const beat = Math.floor(now * 4);
+    this.shards.forEach((s, i) => {
+      if (!s.rest) return;
+      const x = s.x - cam.x, y = s.y - cam.y;
+      rect(ctx, x, y, s.s, s.s, s.c);
+      if (((i * 2654435761 + beat * 40503) >>> 0) % SPARKLE_ONE_IN === 0) {
+        rect(ctx, x - 1, y, 3, 1, PAL.glint);
+        rect(ctx, x, y - 1, 1, 3, PAL.glint);
+        rect(ctx, x, y, 1, 1, PAL.paper);
+      }
+    });
   }
 
   /** Everything in the air, interpolated between ticks. */
@@ -347,6 +391,26 @@ export class Fx {
         }
         const r = 2 + k * 4;
         for (const [ux, uy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) rect(ctx, x + ux * r, y - AIR + uy * r, 1, 1, s.color);
+      } else if (s.kind === 'slash') {
+        // the blade's arc, sweeping across and thinning out
+        const blade = ITEMS.katana.blade!;
+        const R = blade.reach + 4;
+        const n = 9, sweep = Math.min(1, k * 2.2);
+        for (let i = 0; i < n; i++) {
+          const f = i / (n - 1);
+          if (f > sweep) break;
+          const a = s.aim - blade.arc / 2 + blade.arc * f;
+          const r = R - (k > 0.5 && i % 2 ? 2 : 0);
+          rect(ctx, x + Math.cos(a) * r, y - AIR + Math.sin(a) * r * 0.75, i === Math.floor(sweep * (n - 1)) ? 2 : 1, 1, s.color);
+          rect(ctx, x + Math.cos(a) * (r - 2), y - AIR + Math.sin(a) * (r - 2) * 0.75, 1, 1, k < 0.5 ? s.color : PAL.ash);
+        }
+      } else if (s.kind === 'tile') {
+        // a dance-floor tile as the beat drops on it
+        if (k < 0.5) rect(ctx, x - 7, y - 7, 14, 14, s.color);
+        else dither(ctx, x - 7, y - 7, 14, 14, s.color);
+      } else if (s.kind === 'quake') {
+        ring(ctx, x, y, 4 + k * 22, s.color);
+        ring(ctx, x, y, 2 + k * 14, PAL.stone);
       } else if (s.kind === 'dust') {
         rect(ctx, x - 1, y - AIR - 1 - k * 3, 1, 1, s.color);
         rect(ctx, x + 1, y - AIR - k * 4, 1, 1, s.color);
@@ -373,16 +437,15 @@ export class Fx {
     }
   }
 
-  /** Floating words, on real time. */
-  drawPopups(ctx: Ctx, cam: Camera) {
+  /** Floating words, on real time, drawn on the UI layer (`s` UI pixels per game pixel). */
+  drawPopups(ui: Ctx, cam: Camera, s: number) {
     for (const p of this.popups) {
-      const y = p.y - cam.y - p.t * 14;
-      const x = p.x - cam.x - textWidth(p.text) / 2;
       if (p.t > 0.8 && Math.floor(p.t * 20) % 2) continue;
-      drawOutlined(ctx, p.text, x, y, p.color, PAL.paper);
+      const x = (p.x - cam.x) * s, y = (p.y - cam.y - p.t * 14) * s;
+      text(ui, p.text, Math.round(x), Math.round(y), p.color, { align: 'center', outline: PAL.paper });
     }
   }
 }
 
 /** Where coins fly to: the HUD's coin counter, in view pixels. */
-export const COUNTER = { x: 300, y: 6 };
+export const COUNTER = { x: 292, y: 9 };

@@ -30,6 +30,16 @@ export function challengeMet(c: ChallengeId, w: World): boolean {
       return s.bossPunch;
     case 'untouched':
       return s.shieldsUsed === 0 && s.rewinds === 0;
+    case 'hazardKills':
+      return s.hazardKills >= c.n;
+    case 'dropKills':
+      return s.dropKills >= c.n;
+    case 'slashKills':
+      return s.slashKills >= c.n;
+    case 'noFists':
+      return s.punches === 0;
+    case 'bossDrops':
+      return s.bossDrops;
   }
 }
 

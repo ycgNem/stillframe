@@ -26,8 +26,9 @@ await page.goto(base);
 await wait(1500);
 await shot('01-title');
 
-// title → PLAY: a fresh save goes straight into 1-1; the map comes after
-const [pxp, pyp] = await px(160, 85);
+// title → PLAY: a fresh save goes straight into 1-1; the map comes after. The button is on the menu card
+// at the left, in UI pixels (the UI layer is 640×360, half a game pixel each)
+const [pxp, pyp] = await px(124 / 2, 177 / 2);
 await page.mouse.click(pxp, pyp);
 await wait(400);
 await shot('02-first-play');

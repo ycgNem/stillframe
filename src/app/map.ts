@@ -1,100 +1,112 @@
-// The chapter map (GAME_DESIGN §15): level nodes on a pixel floor plan, stars per node, the Workshop
-// door. Levels unlock in order; chapters 2–5 show as locked doors.
-import { CHAPTERS, COMING } from '../data/levels';
+// The chapter map (GAME_DESIGN §15): a tab per chapter, level nodes on a pale plan of the place, stars per
+// node, the selected level on a card, and the Workshop door. Levels unlock in order; a chapter opens when
+// the one before it falls.
+import { CHAPTERS, type ChapterDef } from '../data/levels';
 import type { LevelDef } from '../data/levels/types';
 import { PAL } from '../data/palette';
 import { TICK_RATE } from '../data/tuning';
 import { isUnlocked, record, starCount } from '../meta/save';
-import { centerBig, centerText, drawText, textWidth, wrap } from '../render/font';
-import { dither4, frame, line, rect } from '../render/prims';
-import { VIEW } from '../render/view';
-import { coinIcon, star } from '../ui/kit';
+import { line, rect, ring } from '../render/prims';
+import { bigStar, icon, plate, UI } from '../ui/kit';
+import { measure, rich, text, wrap } from '../ui/text';
 import type { App, Screen } from './app';
 import { PlayScreen } from './play';
 import { TitleScreen } from './title';
 import { WorkshopScreen } from './workshop';
 
-/** Where each level sits on the floor plan (view pixels, node centres). */
-const NODES: Record<string, [number, number]> = {
-  '1-1': [34, 136], '1-2': [80, 136], '1-3': [126, 118], '1-4': [172, 136], '1-5': [218, 118],
-  '1-6': [264, 98], '1-7': [218, 70], '1-8': [150, 60],
-};
+/** Where the eight levels of a chapter sit on its plan, as fractions of the plan; the last is the boss. */
+const PATH: [number, number][] = [[0.1, 0.84], [0.3, 0.84], [0.5, 0.7], [0.7, 0.84], [0.9, 0.62], [0.7, 0.4], [0.45, 0.3], [0.18, 0.2]];
+const PLAN = { x: 248, y: 48, w: 380, h: 266 };
 
 export class MapScreen implements Screen {
   readonly name = 'map';
   readonly cursor = 'pointer';
   private selected: string;
+  private chapter: number;
 
   constructor(
     private app: App,
     focus?: string,
   ) {
-    const levels = CHAPTERS[0].levels;
-    const firstOpen = [...levels].reverse().find((l) => isUnlocked(app.save, l.id)) ?? levels[0];
-    this.selected = focus ?? firstOpen.id;
+    const open = CHAPTERS.flatMap((c) => c.levels).filter((l) => isUnlocked(app.save, l.id));
+    const last = open[open.length - 1] ?? CHAPTERS[0].levels[0];
+    this.selected = focus ?? last.id;
+    this.chapter = Math.max(0, CHAPTERS.findIndex((c) => c.levels.some((l) => l.id === this.selected)));
     app.sound.playing = false;
   }
 
   frame(realDt: number) {
-    const ctx = this.app.display.ctx, ui = this.app.ui, save = this.app.save;
+    const ui = this.app.ui, ctx = ui.ctx, save = this.app.save;
     this.app.sound.update(realDt, 0.3);
+    rect(this.app.world, 0, 0, 320, 180, PAL.paper);
     ui.begin();
-    drawPlan(ctx);
-    const ch = CHAPTERS[0];
-    rect(ctx, 0, 0, VIEW.w, 16, PAL.ink);
-    drawText(ctx, `CHAPTER ${ch.n}`, 40, 3, PAL.slate);
-    drawText(ctx, ch.name, 40, 9, PAL.paper);
-    const stars = `${starCount(save)}/${ch.levels.length * 3}`;
-    star(ctx, 236, 4, true);
-    drawText(ctx, stars, 245, 5, PAL.gold);
-    coinIcon(ctx, 274, 5);
-    drawText(ctx, `${save.coins}`, 281, 5, PAL.gold);
-    if (ui.button('back', 2, 2, 34, 12, 'TITLE', { key: 'Escape' })) this.app.goto(new TitleScreen(this.app));
+    blueprint(ctx);
 
-    // the path between levels
+    // top bar: back, the chapter tabs, what you have
+    rect(ctx, 0, 0, UI.w, 36, PAL.paper);
+    rect(ctx, 0, 36, UI.w, 2, PAL.ink);
+    if (ui.button('back', 8, 6, 74, 24, 'Title', { cap: 'Esc', key: 'Escape' })) this.app.goto(new TitleScreen(this.app));
+    let tx = 92;
+    CHAPTERS.forEach((c, i) => {
+      const open = isUnlocked(save, c.levels[0].id);
+      const label = `${c.n}`;
+      const w = 30;
+      if (ui.button(`ch${i}`, tx, 6, w, 24, open ? label : '{lock}', { enabled: open, on: i === this.chapter, kind: i === this.chapter ? 'primary' : 'normal' })) {
+        this.chapter = i;
+        const first = [...c.levels].reverse().find((l) => isUnlocked(save, l.id)) ?? c.levels[0];
+        this.selected = first.id;
+      }
+      tx += w + 4;
+    });
+    const ch = CHAPTERS[this.chapter];
+    text(ctx, `Chapter ${ch.n}`, tx + 8, 8, PAL.iron);
+    text(ctx, ch.name, tx + 8, 20, PAL.ink);
+    const coins = `${save.coins}`;
+    let rx = UI.w - 12 - measure(coins);
+    text(ctx, coins, rx, 14, PAL.ink);
+    icon(ctx, 'coin', rx - 12, 14);
+    const stars = `${starCount(save)}`;
+    rx -= 30 + measure(stars);
+    text(ctx, stars, rx, 14, PAL.ink);
+    icon(ctx, 'star', rx - 12, 14);
+
+    // the plan, the path, the nodes
+    planArt(ctx, ch.n);
     const ids = ch.levels.map((l) => l.id);
+    const at = (i: number) => [PLAN.x + PATH[i][0] * PLAN.w, PLAN.y + PATH[i][1] * PLAN.h] as const;
     for (let i = 1; i < ids.length; i++) {
-      const [ax, ay] = NODES[ids[i - 1]], [bx, by] = NODES[ids[i]];
+      const [ax, ay] = at(i - 1), [bx, by] = at(i);
       const open = isUnlocked(save, ids[i]);
-      line(ctx, ax, ay, bx, by, open ? PAL.slate : PAL.ash, open ? 0 : 2);
+      for (const o of [-1, 0, 1]) line(ctx, ax, ay + o, bx, by + o, open ? PAL.slate : PAL.ash, open ? 0 : 3);
     }
-    for (const l of ch.levels) this.node(l);
+    ch.levels.forEach((l, i) => this.node(l, ...at(i)));
 
     // the Workshop door
-    if (ui.button('shop', 252, 128, 62, 20, 'WORKSHOP', { key: 'KeyW' })) this.app.goto(new WorkshopScreen(this.app, this.selected));
-    rect(ctx, 252, 124, 62, 4, PAL.slate);
-
-    // the selected level
-    this.info(ch.levels.find((l) => l.id === this.selected) ?? ch.levels[0]);
-    const soon = COMING[0];
-    drawText(ctx, `CHAPTER ${soon.n}: ${soon.name} - COMING SOON`, 8, 20, PAL.ash);
+    if (ui.button('shop', UI.w - 170, UI.h - 40, 158, 30, 'Workshop', { cap: 'W', key: 'KeyW' })) this.app.goto(new WorkshopScreen(this.app, this.selected));
+    this.info(ch, ch.levels.find((l) => l.id === this.selected) ?? ch.levels[0]);
     ui.end();
   }
 
-  private node(l: LevelDef) {
-    const ctx = this.app.display.ctx, ui = this.app.ui, save = this.app.save;
-    const [cx, cy] = NODES[l.id];
+  private node(l: LevelDef, cx: number, cy: number) {
+    const ui = this.app.ui, ctx = ui.ctx, save = this.app.save;
     const open = isUnlocked(save, l.id);
     const rec = record(save, l.id);
     const boss = l.id.endsWith('-8');
-    const s = boss ? 22 : 18;
-    const x = cx - s / 2, y = cy - s / 2;
-    const hover = open && ui.over(x, y, s, s);
+    const s = boss ? 40 : 32;
+    const x = Math.round(cx - s / 2), y = Math.round(cy - s / 2);
     const sel = l.id === this.selected;
-    rect(ctx, x + 2, y + 2, s, s, PAL.ash);
-    rect(ctx, x, y, s, s, !open ? PAL.fog : rec.clears ? PAL.ink : PAL.coal);
-    frame(ctx, x, y, s, s, sel ? PAL.cyan : hover ? PAL.paper : open ? PAL.slate : PAL.ash);
-    if (sel) frame(ctx, x - 2, y - 2, s + 4, s + 4, PAL.cyan);
-    if (open) centerText(ctx, l.id, cx, cy - 2, boss ? PAL.hot : PAL.paper);
-    else {
-      // a padlock
-      rect(ctx, cx - 3, cy - 1, 7, 5, PAL.stone);
-      frame(ctx, cx - 2, cy - 5, 5, 5, PAL.stone);
-    }
-    for (let i = 0; i < 3; i++) {
-      if (!open) continue;
-      rect(ctx, x + 3 + i * 5 + (boss ? 2 : 0), y + s - 5, 3, 3, rec.stars[i] ? PAL.gold : PAL.iron);
-    }
+    const hover = open && ui.over(x, y, s, s);
+    if (sel) plate(ctx, x - 4, y - 4, s + 8, s + 8, PAL.cyan, null);
+    plate(ctx, x, y, s, s, boss && open ? PAL.blood : open ? PAL.ink : PAL.ash, PAL.stone);
+    rect(ctx, x + 2, y + 2, s - 4, s - 4, !open ? PAL.fog : hover ? PAL.fog : PAL.paper);
+    if (open) {
+      text(ctx, l.id, cx, y + (boss ? 9 : 6), boss ? PAL.blood : PAL.ink, { align: 'center' });
+      for (let i = 0; i < 3; i++) {
+        const px = Math.round(cx - 13 + i * 9), py = y + s - (boss ? 14 : 12);
+        rect(ctx, px, py, 8, 8, rec.stars[i] ? PAL.amber : PAL.ash);
+        rect(ctx, px + 1, py + 1, 6, 6, rec.stars[i] ? PAL.gold : PAL.fog);
+      }
+    } else icon(ctx, 'lock', cx - 4, cy - 4);
     if (hover && ui.clicked) {
       if (sel) this.app.goto(new PlayScreen(this.app, l.id));
       else {
@@ -105,37 +117,71 @@ export class MapScreen implements Screen {
     }
   }
 
-  private info(l: LevelDef) {
-    const ctx = this.app.display.ctx, ui = this.app.ui, save = this.app.save;
+  private info(ch: ChapterDef, l: LevelDef) {
+    const ui = this.app.ui, ctx = ui.ctx, save = this.app.save;
     const rec = record(save, l.id);
-    const x = 8, y = 26, w = 128, h = 66;
-    ui.panel(x, y, w, h);
-    drawText(ctx, l.id, x + 6, y + 5, PAL.slate);
-    drawText(ctx, l.name, x + 6 + textWidth(l.id) + 4, y + 5, PAL.paper);
-    const goal = l.goal.kind === 'clear' ? 'CLEAR THE ROOM' : l.goal.kind === 'escape' ? 'ESCAPE' : `SURVIVE ${l.goal.seconds} S`;
-    drawText(ctx, goal, x + 6, y + 13, PAL.hot);
-    drawText(ctx, `PAR ${l.par} S`, x + 6, y + 20, PAL.stone);
-    if (rec.best) drawText(ctx, `BEST ${(rec.best / TICK_RATE).toFixed(1)}`, x + 60, y + 20, PAL.tide);
-    wrap(l.challengeText, w - 22).slice(0, 2).forEach((t, i) => drawText(ctx, t, x + 16, y + 28 + i * 6, rec.stars[2] ? PAL.gold : PAL.fog));
-    star(ctx, x + 6, y + 27, rec.stars[2]);
+    const x = 12, y = 48, w = 224, h = 300;
+    ui.card(x, y, w, h);
+    ui.chip(x + 10, y + 10, `Level ${l.id}`, PAL.fog);
+    const goal = l.goal.kind === 'clear' ? 'Clear the room' : l.goal.kind === 'escape' ? 'Escape' : `Survive ${l.goal.seconds} s`;
+    ui.chip(x + w - 10 - measure(goal) - 8, y + 10, goal, l.goal.kind === 'clear' ? PAL.red : PAL.cyan, l.goal.kind === 'clear' ? PAL.paper : PAL.ink);
+    const name = l.name.toUpperCase();
+    const big = measure(name, 'shard') <= w - 20;
+    if (big) text(ctx, name, x + 10, y + 32, PAL.ink, { face: 'shard' });
+    else text(ctx, l.name, x + 10, y + 34, PAL.ink);
+    text(ctx, ch.setting, x + 10, y + 50, PAL.iron);
+    rect(ctx, x + 10, y + 64, w - 20, 1, PAL.fog);
+    text(ctx, l.goal.kind === 'survive' ? 'No par: survive it' : `Par ${l.par} s`, x + 10, y + 72, PAL.ink);
+    if (rec.best) text(ctx, `Best ${(rec.best / TICK_RATE).toFixed(1)} s`, x + w - 10, y + 72, PAL.tide, { align: 'right' });
+    const rows: [string, string][] = [['Clear', 'Finish the level'], ['Par', l.goal.kind === 'survive' ? 'Comes with surviving' : `Under ${l.par} game seconds`], ['Challenge', l.challengeText]];
+    let ry = y + 92;
+    rows.forEach(([a, b], i) => {
+      bigStar(ctx, x + 10, ry - 3, rec.stars[i]);
+      text(ctx, a, x + 30, ry, rec.stars[i] ? PAL.amber : PAL.ink);
+      const lines = wrap(b, w - 42);
+      lines.forEach((t, j) => text(ctx, t, x + 30, ry + 12 + j * 12, PAL.iron));
+      ry += 16 + lines.length * 12;
+    });
+    rich(ctx, l.tip, x + 10, ry + 4, { color: PAL.slate, accent: PAL.tide, maxW: w - 20, lineH: 13 });
     const open = isUnlocked(save, l.id);
-    if (ui.button('play', x + 6, y + h - 18, w - 12, 13, open ? (rec.clears ? 'PLAY AGAIN' : 'PLAY') : 'LOCKED', { enabled: open, primary: true, key: 'Enter' })) {
+    const label = open ? (rec.clears ? 'Play again' : 'Play') : '{lock} Locked';
+    if (ui.button('play', x + 10, y + h - 40, w - 20, 30, label, { enabled: open, kind: 'primary', cap: 'Enter', key: 'Enter' })) {
       this.app.goto(new PlayScreen(this.app, l.id));
     }
   }
 }
 
-/** A pale office floor plan behind the nodes. */
-function drawPlan(ctx: CanvasRenderingContext2D) {
-  rect(ctx, 0, 0, VIEW.w, VIEW.h, PAL.paper);
-  for (let x = 0; x < VIEW.w; x += 8) rect(ctx, x, 0, 1, VIEW.h, PAL.fog);
-  for (let y = 0; y < VIEW.h; y += 8) rect(ctx, 0, y, VIEW.w, 1, PAL.fog);
-  // rooms
-  const walls: [number, number, number, number][] = [
-    [6, 104, 150, 1], [6, 104, 1, 56], [6, 160, 300, 1], [150, 30, 1, 75], [150, 30, 160, 1], [310, 30, 1, 130],
-    [186, 84, 1, 42], [186, 84, 60, 1], [100, 104, 1, 56], [240, 30, 1, 30],
-  ];
-  for (const [x, y, w, h] of walls) rect(ctx, x, y, w + (h === 1 ? 0 : 2), h + (w === 1 ? 0 : 2), PAL.stone);
-  dither4(ctx, 152, 32, 86, 26, PAL.ash);
-  centerBig(ctx, '', 0, 0, PAL.ink);
+/** Pale paper with a fog grid. */
+function blueprint(ctx: CanvasRenderingContext2D) {
+  rect(ctx, 0, 0, UI.w, UI.h, PAL.paper);
+  for (let x = 0; x < UI.w; x += 16) rect(ctx, x, 0, 1, UI.h, PAL.fog);
+  for (let y = 0; y < UI.h; y += 16) rect(ctx, 0, y, UI.w, 1, PAL.fog);
+}
+
+/** A faint plan of the chapter's place behind its nodes. */
+function planArt(ctx: CanvasRenderingContext2D, n: number) {
+  const { x, y, w, h } = PLAN;
+  const wall = (ax: number, ay: number, bw: number, bh: number) => rect(ctx, x + ax * w, y + ay * h, Math.max(2, bw * w), Math.max(2, bh * h), PAL.ash);
+  if (n === 1) {
+    // office floors: rooms and corridors
+    wall(0, 0.66, 0.6, 0); wall(0, 0.66, 0, 0.34); wall(0, 1, 1, 0); wall(0.6, 0.1, 0, 0.56); wall(0.6, 0.1, 0.4, 0);
+    wall(1, 0.1, 0, 0.9); wall(0.3, 0.66, 0, 0.34); wall(0.75, 0.5, 0, 0.3); wall(0.75, 0.5, 0.25, 0); wall(0.05, 0.05, 0.4, 0);
+  } else if (n === 2) {
+    // a platform between two tracks
+    for (const ty of [0.12, 0.56]) {
+      rect(ctx, x, y + ty * h, w, 2, PAL.ash);
+      rect(ctx, x, y + ty * h + 14, w, 2, PAL.ash);
+      for (let sx = 0; sx < w; sx += 12) rect(ctx, x + sx, y + ty * h - 2, 3, 20, PAL.fog);
+    }
+  } else if (n === 3) {
+    // girders crossing the sky
+    for (let i = 0; i < 6; i++) line(ctx, x + i * w / 6, y + h, x + i * w / 6 + w / 6, y, PAL.ash, 0);
+    rect(ctx, x, y + h * 0.5, w, 2, PAL.ash);
+  } else if (n === 4) {
+    // a dance floor
+    for (let gx = 0; gx < 8; gx++) for (let gy = 0; gy < 6; gy++) if ((gx + gy) % 2) rect(ctx, x + 40 + gx * 38, y + 20 + gy * 38, 36, 36, PAL.fog);
+  } else {
+    // the void, ringing
+    for (let r = 20; r < 150; r += 26) ring(ctx, x + w / 2, y + h / 2, r, PAL.fog);
+  }
 }

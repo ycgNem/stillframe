@@ -53,6 +53,84 @@
    ]
   },
   {
+   "name": "held_smg",
+   "file": "held_smg.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_smg",
+   "file": "item_smg.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "held_rifle",
+   "file": "held_rifle.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_rifle",
+   "file": "item_rifle.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "held_katana",
+   "file": "held_katana.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_katana",
+   "file": "item_katana.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
    "name": "held_bottle",
    "file": "held_bottle.png",
    "frame": [
@@ -167,6 +245,32 @@
    "pivot": [
     12,
     14
+   ]
+  },
+  {
+   "name": "thrown_beam",
+   "file": "thrown_beam.png",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 4,
+   "pivot": [
+    12,
+    12
+   ]
+  },
+  {
+   "name": "thrown_record",
+   "file": "thrown_record.png",
+   "frame": [
+    14,
+    14
+   ],
+   "frames": 4,
+   "pivot": [
+    7,
+    7
    ]
   },
   {

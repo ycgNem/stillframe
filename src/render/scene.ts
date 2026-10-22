@@ -3,15 +3,17 @@
 // sim ticks so slow time still glides. Layer order follows docs/PLAN.md "Rendering".
 import { ITEMS } from '../data/items';
 import { PAL } from '../data/palette';
-import { REDS } from '../data/reds';
+import { CONDUCTOR, REDS } from '../data/reds';
+import { STROBE, TICK_RATE, TILE } from '../data/tuning';
 import { rayLength } from '../sim/grid';
 import type { World } from '../sim/types';
 import type { Atlas } from './atlas';
-import { drawActor, drawItem, drawShadow, drawThrown, handAt, playerPose, redPose, type ActorKind, type Pose } from './actors';
-import { drawText } from './font';
+import { actorSprite, drawActor, drawItem, drawShadow, drawThrown, handAt, playerPose, redPose, type ActorKind, type Pose } from './actors';
+import { text } from '../ui/text';
 import type { Fx } from './fx';
+import { drawHazardsAir, drawHazardsFloor, trainSprites } from './hazards';
 import { doorHole, OY, type LevelArt } from './level';
-import { line, lerp, rect, ring, type Ctx } from './prims';
+import { dither, line, lerp, rect, ring, type Ctx } from './prims';
 import { AIR, type Camera } from './view';
 
 export interface SceneOpts {
@@ -24,6 +26,20 @@ export interface SceneOpts {
   showPlayer: boolean;
   /** how far your faint aim line reaches (to the cursor); 0 hides it */
   aimReach: number;
+  /** the UI layer, for words over the world (popups, the exit label); none in thumbnails */
+  ui?: Ctx;
+  /** reds get a thick ink outline (Settings) */
+  outline?: boolean;
+  /** fewer flashes (Settings): warnings hold steady instead of blinking, and no strobe */
+  calm?: boolean;
+  /** the level's lights strobe: dark between flashes, with only what glows showing */
+  strobe?: boolean;
+}
+
+/** Strobe rooms are dark except for a flash at the start of every cycle, on game time. */
+function strobeDark(w: World, alpha: number) {
+  const t = (w.tick - 1 + alpha) / TICK_RATE;
+  return t % STROBE.cycle >= STROBE.lit;
 }
 
 export function drawScene(ctx: Ctx, w: World, art: LevelArt, atlas: Atlas, fx: Fx, cam: Camera, alpha: number, o: SceneOpts) {
@@ -38,11 +54,9 @@ export function drawScene(ctx: Ctx, w: World, art: LevelArt, atlas: Atlas, fx: F
     rect(ctx, h.x - cam.x, h.y - cam.y, h.w, h.h, PAL.coal);
     rect(ctx, h.x - cam.x, h.y - cam.y, h.w, 2, PAL.ink);
   }
-  if (w.exit && w.goal.kind === 'escape' && Math.floor(o.now * 2) % 2) {
-    drawText(ctx, 'EXIT', w.exit.x - cam.x - 7, w.exit.y - cam.y - 16, PAL.ink);
-  }
 
-  fx.drawFloor(ctx, cam);
+  fx.drawFloor(ctx, cam, o.now);
+  drawHazardsFloor(ctx, w, cam, alpha, o.now, !!o.calm);
   for (const it of w.items) drawItem(ctx, atlas, it, Math.round(it.x - cam.x), Math.round(it.y - cam.y), it.id === o.hoverItem);
 
   // standing things, by depth
@@ -57,11 +71,25 @@ export function drawScene(ctx: Ctx, w: World, art: LevelArt, atlas: Atlas, fx: F
     if (p.shield > 0) list.push({ base: p.y - 0.1, draw: () => shieldMark(ctx, ppx, ppy, p.shield) });
   }
   for (const r of w.reds) {
+    if (r.dead) continue;
     const x = lerp(r.px, r.x, alpha) - cam.x, y = lerp(r.py, r.y, alpha) - cam.y;
+    if (r.hidden) {
+      // off the floor: riding a train's roof, or coming down onto its landing mark
+      if (r.state === 'ride') {
+        const pose = redPose(r, x, y - 13);
+        list.push({ base: r.y + TILE, draw: () => drawRed(ctx, atlas, r.kind, pose, r, o.now, !!o.outline) });
+      } else if (r.state === 'land') {
+        const k = Math.max(0, r.t / CONDUCTOR.landTell);
+        const pose = redPose(r, r.tx - cam.x, r.ty - cam.y - k * 90);
+        list.push({ base: r.ty, draw: () => drawRed(ctx, atlas, r.kind, pose, r, o.now, !!o.outline) });
+      }
+      continue;
+    }
     drawShadow(ctx, r.kind, x, y);
     const pose = redPose(r, x, y);
-    list.push({ base: r.y, draw: () => drawRed(ctx, atlas, r.kind, pose, r, o.now) });
+    list.push({ base: r.y, draw: () => drawRed(ctx, atlas, r.kind, pose, r, o.now, !!o.outline) });
   }
+  list.push(...trainSprites(ctx, w, cam, alpha));
   for (const oc of art.occluders) {
     const src = oc.layer === 'floor' ? art.floor : art.props;
     list.push({ base: oc.base, draw: () => ctx.drawImage(src, oc.sx, oc.sy, oc.w, oc.h, oc.sx - cam.x, oc.sy - OY - cam.y, oc.w, oc.h) });
@@ -93,6 +121,41 @@ export function drawScene(ctx: Ctx, w: World, art: LevelArt, atlas: Atlas, fx: F
     rect(ctx, x - 1, y, 3, 1, PAL.ash);
     drawThrown(ctx, atlas, t.kind, x, y, (w.tick + alpha) * 0.6 + t.id);
   }
+  drawBullets(ctx, w, cam, alpha);
+  drawHazardsAir(ctx, w, cam, alpha, o.now, !!o.calm);
+  if (o.strobe && !o.calm && strobeDark(w, alpha)) {
+    // between flashes: the room goes dark; the floor's warnings, the reds, the bullets and you still show
+    rect(ctx, 0, 0, 320, 180, PAL.ink);
+    dither(ctx, 0, 0, 320, 180, PAL.coal);
+    drawHazardsFloor(ctx, w, cam, alpha, o.now, false);
+    // what you can pick up stays findable: a grey shape where it lies
+    for (const it of w.items) {
+      const name = `item_${it.kind}`;
+      if (atlas.has(name)) atlas.drawTinted(ctx, name, 0, Math.round(it.x - cam.x), Math.round(it.y - cam.y), false, it.id === o.hoverItem ? PAL.cyan : PAL.stone);
+    }
+    for (const r of w.reds) {
+      if (r.dead || r.hidden) continue;
+      const pose = redPose(r, lerp(r.px, r.x, alpha) - cam.x, lerp(r.py, r.y, alpha) - cam.y);
+      const sp = actorSprite(r.kind, pose.aim, pose.frame);
+      if (atlas.has(sp.name)) {
+        // an ink rim keeps a glowing red apart from a lit red tile
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) atlas.drawTinted(ctx, sp.name, pose.frame, pose.x + dx, pose.y + dy, sp.flip, PAL.ink);
+        atlas.drawTinted(ctx, sp.name, pose.frame, pose.x, pose.y, sp.flip, PAL.hot);
+      }
+    }
+    if (o.showPlayer && w.status !== 'dead') drawActor(ctx, atlas, 'player', playerPose(p, ppx, ppy, o.aim), p.hands[0] ?? null);
+    drawBullets(ctx, w, cam, alpha);
+  }
+  fx.drawAir(ctx, cam, alpha, o.now);
+  if (o.ui) {
+    if (w.exit && w.goal.kind === 'escape' && Math.floor(o.now * 2) % 2) {
+      text(o.ui, 'Exit', (w.exit.x - cam.x) * 2, (w.exit.y - cam.y - 22) * 2, PAL.ink, { align: 'center', outline: PAL.paper });
+    }
+    fx.drawPopups(o.ui, cam, 2);
+  }
+}
+
+function drawBullets(ctx: Ctx, w: World, cam: Camera, alpha: number) {
   for (const b of w.bullets) {
     const x = lerp(b.px, b.x, alpha) - cam.x, y = lerp(b.py, b.y, alpha) - cam.y;
     const sp = Math.hypot(b.vx, b.vy) || 1;
@@ -101,13 +164,15 @@ export function drawScene(ctx: Ctx, w: World, art: LevelArt, atlas: Atlas, fx: F
     line(ctx, tx, ty - AIR, x, y - AIR, b.from === 'player' ? PAL.iron : PAL.red);
     rect(ctx, x - 1, y - AIR - 1, 2, 2, b.from === 'player' ? PAL.ink : PAL.hot);
   }
-  fx.drawAir(ctx, cam, alpha, o.now);
-  fx.drawPopups(ctx, cam);
 }
 
-function drawRed(ctx: Ctx, atlas: Atlas, kind: ActorKind, pose: Pose, r: World['reds'][number], now: number) {
+function drawRed(ctx: Ctx, atlas: Atlas, kind: ActorKind, pose: Pose, r: World['reds'][number], now: number, outline: boolean) {
+  if (outline) {
+    const sp = actorSprite(kind, pose.aim, pose.frame);
+    if (atlas.has(sp.name)) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-2, 0], [2, 0], [0, -2], [0, 2]]) atlas.drawTinted(ctx, sp.name, pose.frame, pose.x + dx, pose.y + dy, sp.flip, PAL.ink);
+  }
   drawActor(ctx, atlas, kind, pose, r.held);
-  const top = pose.y - (kind === 'manager' ? 36 : kind === 'brute' ? 32 : 26);
+  const top = pose.y - REDS[r.kind].tall - 4;
   if (r.stun > 0) {
     // dazed: three sparks circling the head
     for (let i = 0; i < 3; i++) {
@@ -115,21 +180,22 @@ function drawRed(ctx: Ctx, atlas: Atlas, kind: ActorKind, pose: Pose, r: World['
       rect(ctx, pose.x + Math.cos(a) * 6 - 1, top + 2 + Math.sin(a) * 2, 2, 2, PAL.hot);
     }
   }
-  if (r.guard > 0 && Math.floor(now * 6) % 4) {
+  // (an eye's guard is its shut lid, drawn in the sprite)
+  if (r.guard > 0 && r.kind !== 'eye' && Math.floor(now * 6) % 4) {
     // shrugging off damage: a solid ring, dark outside and light inside so it reads on any floor
     ring(ctx, pose.x, pose.y - 14, 15, PAL.ink);
     ring(ctx, pose.x, pose.y - 14, 14, PAL.paper);
   }
-  const telling = r.state === 'windup' || r.state === 'aim' || r.state === 'throwTell' || r.state === 'chargeTell' || r.state === 'deskTell';
+  const telling = r.state === 'windup' || r.state === 'aim' || r.state === 'throwTell' || r.state === 'chargeTell' || r.state === 'deskTell' || r.state === 'ringTell' || r.state === 'board';
   if (telling) {
     // "!" over the head: something is coming
     rect(ctx, pose.x, top - 6, 1, 4, PAL.hot);
     rect(ctx, pose.x, top - 1, 1, 1, PAL.hot);
   }
-  if (r.kind === 'manager') {
+  if (REDS[r.kind].boss) {
     const w = 24, x = pose.x - w / 2;
     rect(ctx, x - 1, top - 10, w + 2, 4, PAL.wine);
-    rect(ctx, x, top - 9, Math.max(0, Math.round((w * r.hp) / REDS.manager.hp)), 2, PAL.red);
+    rect(ctx, x, top - 9, Math.max(0, Math.round((w * r.hp) / REDS[r.kind].hp)), 2, PAL.red);
   }
 }
 

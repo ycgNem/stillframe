@@ -6,7 +6,8 @@ import { TICK_RATE } from '../data/tuning';
 import { applyClear, record } from '../meta/save';
 import { tally } from '../meta/tally';
 import { Fx } from '../render/fx';
-import { centerBig, centerText } from '../render/font';
+import { UI } from '../ui/kit';
+import { rich, text } from '../ui/text';
 import { LevelArt } from '../render/level';
 import { rect } from '../render/prims';
 import { drawScene } from '../render/scene';
@@ -72,7 +73,7 @@ export class ReplayScreen implements Screen {
   }
 
   frame(realDt: number, alpha: number) {
-    const ctx = this.app.display.ctx, w = this.world, p = w.player;
+    const ctx = this.app.world, ui = this.app.ui, w = this.world, p = w.player;
     this.t += realDt;
     this.app.sound.update(realDt, 1);
     if (this.i >= this.play.rec.length) {
@@ -86,21 +87,25 @@ export class ReplayScreen implements Screen {
     followCamera(this.cam, w, px, py, VIEW.w / 2, VIEW.h / 2, realDt, this.t === realDt);
     this.fx.real(realDt, this.cam, { x: 0, y: 0 });
     drawScene(ctx, w, this.art, this.app.atlas, this.fx, this.cam, alpha, { aim: p.aim, hoverItem: 0, now: this.app.now, showPlayer: true, aimReach: 0 });
+    ui.begin();
     // the chant, alternating in real time
     const word = Math.floor(this.t / WORD_TIME);
     if (word !== this.word) {
       this.word = word;
       this.app.sound.chant(word % 2 ? 'FRAME' : 'STILL');
     }
-    // the words sit at the edges, outlined, so the replay itself stays in view: STILL. up top, FRAME. below
+    // the words sit at the edges, ink with a paper rim, so the replay itself stays in view: STILL. up top,
+    // FRAME. below
     const label = word % 2 ? 'FRAME.' : 'STILL.';
     const k = (this.t % WORD_TIME) / WORD_TIME;
     if (k < 0.75) {
-      const y = word % 2 ? VIEW.h - 38 : 8;
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [2, 2]]) centerBig(ctx, label, VIEW.w / 2 + dx, y + dy, PAL.ink, 3);
-      centerBig(ctx, label, VIEW.w / 2, y, PAL.paper, 3);
+      const y = word % 2 ? UI.h - 92 : 16;
+      text(ui.ctx, label, UI.w / 2 + 4, y + 4, PAL.ash, { face: 'shard', scale: 5, align: 'center' });
+      text(ui.ctx, label, UI.w / 2, y, PAL.ink, { face: 'shard', scale: 5, align: 'center', outline: PAL.paper });
     }
-    rect(ctx, 0, VIEW.h - 10, VIEW.w, 10, PAL.ink);
-    centerText(ctx, `HOLD SPACE: X2   ANY KEY: SKIP   ${(this.i / TICK_RATE).toFixed(1)} S`, VIEW.w / 2, VIEW.h - 8, PAL.slate);
+    rect(ui.ctx, 0, UI.h - 24, UI.w, 24, PAL.ink);
+    rect(ui.ctx, 0, UI.h - 22, UI.w, 22, PAL.paper);
+    rich(ui.ctx, `Hold [Space] for ×2    any other key skips    ${(this.i / TICK_RATE).toFixed(1)} s`, UI.w / 2, UI.h - 15, { color: PAL.iron, align: 'center' });
+    ui.end();
   }
 }

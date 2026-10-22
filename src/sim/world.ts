@@ -3,6 +3,7 @@
 import { TICK_RATE } from '../data/tuning';
 import { separate, stepReds } from './ai';
 import { cellIndex } from './grid';
+import { stepHazards } from './hazards';
 import { stepCombo } from './kills';
 import { updateFlow } from './nav';
 import { stepPlayer } from './player';
@@ -37,6 +38,7 @@ export function step(w: World, input: TickInput): SimEvent[] {
   }
 
   stepPlayer(w, input, ev);
+  stepHazards(w, ev);
   updateFlow(w);
   stepReds(w, ev);
   separate(w);

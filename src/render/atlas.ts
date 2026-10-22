@@ -18,6 +18,7 @@ export interface SheetJson {
 export class Atlas {
   private img: HTMLImageElement | null = null;
   private pixelCache = new Map<string, { w: number; h: number; data: Uint8ClampedArray }>();
+  private tints = new Map<string, HTMLCanvasElement>();
   ready = false;
 
   constructor(
@@ -56,6 +57,27 @@ export class Atlas {
     ctx.scale(-1, 1);
     ctx.drawImage(this.img, sx, sy, w, h, -(w - s.pivot[0]) + 0, py - s.pivot[1], w, h);
     ctx.restore();
+  }
+
+  /** Draws a frame as a flat silhouette in one colour (outlines, flashes). */
+  drawTinted(ctx: CanvasRenderingContext2D, name: string, f: number, x: number, y: number, flip: boolean, color: string) {
+    if (!this.img) return;
+    let sheet = this.tints.get(color);
+    if (!sheet) {
+      sheet = document.createElement('canvas');
+      sheet.width = this.img.width;
+      sheet.height = this.img.height;
+      const c = sheet.getContext('2d')!;
+      c.drawImage(this.img, 0, 0);
+      c.globalCompositeOperation = 'source-in';
+      c.fillStyle = color;
+      c.fillRect(0, 0, sheet.width, sheet.height);
+      this.tints.set(color, sheet);
+    }
+    const real = this.img;
+    this.img = sheet as unknown as HTMLImageElement;
+    this.draw(ctx, name, f, x, y, flip);
+    this.img = real;
   }
 
   /** The RGBA pixels of one frame (for shatter shards), cached. */

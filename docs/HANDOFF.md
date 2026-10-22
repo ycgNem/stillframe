@@ -4,6 +4,37 @@ Running notes for whoever (human or AI session) picks this up next. Newest statu
 
 ## Status
 
+**2026-10-22 (late) — M8–M12 built: chapters 2–5, the Gauntlet, new type and UI. Not pushed.**
+
+- **Asked for:** finish the remaining milestones, and redo the text and UI to be clearer to read, "the
+  opposite of Last Watt", like Fins & Fronds and Foldworks.
+- **Type and UI:** text now lives on its own 640×360 layer (`src/engine/screen.ts`) in two new faces
+  (`src/ui/fonts.ts`: Pane for reading, Shard for titles), sentence case, ink on paper cards with cut
+  corners and hard shadows (`src/ui/kit.ts`), rich text with keycaps from your own bindings and icons
+  (`src/ui/text.ts`). Every screen and the HUD were rebuilt on it. Rules in STYLE.md §8.
+- **Chapters 2–5** (`src/data/levels/ch2.ts`…`ch5.ts`): 32 levels, 4 bosses, the ending and credits.
+  Sim: new weapons (SMG, rifle, katana), reds (Runner, Sniper, Mirror, Splitter and Shards), hazards
+  in `src/sim/hazards.ts` (trains, hooks, the beat, wells, echoes), boss moves in `src/sim/bosses.ts`,
+  glitches (inverse in the time rule, mirror and echo in the sim). Render: `src/render/hazards.ts`,
+  per-chapter themes and new props in `level.ts`, strobe in `scene.ts`. Art: all hand-made in
+  `pixel-art/actors` and `pixel-art/items` (**PixelLab still 0 / 100**).
+- **Gauntlet:** `src/app/gauntlet.ts`, rounds in `src/meta/gauntlet.ts`, arenas in `src/data/gauntlet.ts`.
+- **A rule change worth a human look:** heavy reds (Brutes, bosses) now shrug off punches after the
+  first, like throws, and can't be pushed. It stopped a stun-lock the bot found, and makes the Manager
+  a real fight (1-8's par 24 → 53 from the bot's slower clear).
+- **Checks:** `npm test` 179 tests (every level cleared by the bot with a matching replay; every new
+  verb; the Gauntlet; heavy reds); `npm run typecheck`; `npm run build`; Playwright `smoke`, `screens`,
+  `levels`, `clear`, `abilities`, `ui` all pass against the dev server, and the new `e2e/perf.mjs`
+  (3.0 ms mean work per frame with 41 reds and ~3,500 shards). Economy: 70% of the Workshop from one
+  pass (`scripts/economy.ts`). Level tuning: `node scripts/run.mjs scripts/dev/botcheck.ts <chapter>`.
+- **Review:** `critique/2026-10-22-chapters.md` is Claude's own pass over the new content (12 issues
+  found and fixed), not fresh eyes.
+- **Not done:** nothing is committed or pushed, so the live site is still the MVP. M7's human playtest
+  box and M12's critic and "live" boxes stay open.
+- **Next:** commit and push to deploy (it tests and builds on the way); a fresh-eyes critic pass or a
+  human playtest of chapters 2–5 and the Gauntlet; tighten 1-8's par after a human clear; listen to
+  the new sounds.
+
 **2026-10-22 (night) — Live at https://ycgnem.github.io/stillframe/; first critic pass done.**
 
 - **Published:** repo github.com/ycgNem/stillframe (public), Pages from GitHub Actions; every push to

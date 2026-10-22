@@ -48,6 +48,7 @@ export function playerPose(p: Player, x: number, y: number, aim: number): Pose {
 }
 
 export function redPose(r: Red, x: number, y: number): Pose {
+  if (r.kind === 'eye') return { x, y, aim: r.aim, frame: eyeFrame(r), hurt: r.hurt > 0 };
   const moving = Math.hypot(r.x - r.px, r.y - r.py) > 0.01;
   let frame = walkFrame(moving, r.walked);
   if (r.state === 'windup' || r.state === 'throwTell' || r.state === 'deskTell' || r.state === 'chargeTell') frame = 5;
@@ -55,12 +56,30 @@ export function redPose(r: Red, x: number, y: number): Pose {
   return { x, y, aim: r.aim, frame, hurt: r.hurt > 0 };
 }
 
+/** An eye of the Frame: shut while it guards, wide on its tell, pinned as it fires, else looking about. */
+function eyeFrame(r: Red): number {
+  if (r.state === 'aim' || r.state === 'ringTell') return 5;
+  if (r.state === 'recover' && r.t > 0.1) return 6;
+  if (r.guard > 0) return 0;
+  return 1 + (Math.floor(-r.timer * 3) & 3);
+}
+
+const RED = { body: PAL.red, light: PAL.hot, dark: PAL.blood, outline: PAL.wine };
 const BODY: Record<ActorKind, { body: string; light: string; dark: string; outline: string; size: number }> = {
   player: { body: PAL.fog, light: PAL.paper, dark: PAL.ash, outline: PAL.ink, size: 1 },
-  grunt: { body: PAL.red, light: PAL.hot, dark: PAL.blood, outline: PAL.wine, size: 1 },
-  gunner: { body: PAL.red, light: PAL.hot, dark: PAL.blood, outline: PAL.wine, size: 1 },
-  brute: { body: PAL.red, light: PAL.hot, dark: PAL.blood, outline: PAL.wine, size: 1.35 },
-  manager: { body: PAL.red, light: PAL.hot, dark: PAL.blood, outline: PAL.wine, size: 1.5 },
+  grunt: { ...RED, size: 1 },
+  gunner: { ...RED, size: 1 },
+  brute: { ...RED, size: 1.35 },
+  runner: { ...RED, size: 0.95 },
+  sniper: { ...RED, size: 1.05 },
+  mirror: { ...RED, light: PAL.glint, size: 1 },
+  splitter: { ...RED, size: 1.05 },
+  shardling: { ...RED, size: 0.65 },
+  manager: { ...RED, size: 1.5 },
+  conductor: { ...RED, size: 1.5 },
+  foreman: { ...RED, size: 1.6 },
+  dj: { ...RED, size: 1.35 },
+  eye: { ...RED, size: 1.2 },
 };
 
 export function drawShadow(ctx: Ctx, kind: ActorKind, x: number, y: number) {
@@ -71,6 +90,8 @@ export function drawShadow(ctx: Ctx, kind: ActorKind, x: number, y: number) {
 /** A character with its held item; the item goes behind the body when facing away. */
 export function drawActor(ctx: Ctx, atlas: Atlas, kind: ActorKind, pose: Pose, held: Held | null) {
   if (pose.hidden) return;
+  // an eye of the Frame fires from itself, not from a gun
+  if (kind === 'eye') held = null;
   const sp = actorSprite(kind, pose.aim, pose.frame);
   const behind = Math.sin(pose.aim) < -0.2;
   if (held && behind) drawHeld(ctx, atlas, held.kind, pose, kind);
@@ -138,11 +159,13 @@ export function drawItem(ctx: Ctx, atlas: Atlas, it: Item | { kind: ItemKind; x:
 
 /** Something in flight: spins through the 16 angles as it goes. */
 export function drawThrown(ctx: Ctx, atlas: Atlas, kind: ItemKind, x: number, y: number, spin: number) {
+  // what the bosses lob has its own tumbling frames
+  const lobbed = `thrown_${kind}`;
+  if (atlas.has(lobbed)) {
+    atlas.draw(ctx, lobbed, Math.floor(spin) % atlas.frames(lobbed), x, y - AIR);
+    return;
+  }
   if (kind === 'desk') {
-    if (atlas.has('thrown_desk')) {
-      atlas.draw(ctx, 'thrown_desk', Math.floor(spin) % atlas.frames('thrown_desk'), x, y - AIR);
-      return;
-    }
     rect(ctx, x - 7, y - AIR - 6, 14, 9, PAL.stone);
     rect(ctx, x - 7, y - AIR - 6, 14, 5, PAL.fog);
     rect(ctx, x - 7, y - AIR - 6, 14, 1, PAL.paper);

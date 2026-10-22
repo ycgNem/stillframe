@@ -8,35 +8,45 @@ import { PAL } from '../data/palette';
 import { REDS } from '../data/reds';
 import { REWIND, TICK_RATE, TIME } from '../data/tuning';
 import { TIER_VALUES } from '../data/upgrades';
+import { newIn } from '../meta/novelty';
 import { record } from '../meta/save';
-import { cloneWorld } from '../sim/hash';
+import { keepSnap, newRewind, rewind, type RewindBuffer } from '../meta/rewind';
 import { pickTarget, punchTarget, reachOf } from '../sim/player';
 import { createTime, spendBurst, startBurst, updateTime, type TimeState } from '../sim/time';
-import type { Mods, SimEvent, TickInput, World } from '../sim/types';
+import type { Hazard, Mods, SimEvent, TickInput, World } from '../sim/types';
 import { createWorld, step } from '../sim/world';
 import { Fx } from '../render/fx';
-import { bigWidth, centerBig, centerText, drawBig, drawText, textWidth, wrap } from '../render/font';
 import { drawHud } from '../render/hud';
 import { LevelArt } from '../render/level';
 import { dither, line, rect, ring } from '../render/prims';
 import { drawScene } from '../render/scene';
 import { AIR, followCamera, newCamera, shake, VIEW, type Camera } from '../render/view';
-import { star } from '../ui/kit';
+import { bigStar, plate, UI } from '../ui/kit';
+import { measure, rich, richLines, text } from '../ui/text';
 import type { App, Screen } from './app';
 import { playEvent } from './events';
+import { keyLabel } from './keys';
 import { MapScreen } from './map';
 import { ReplayScreen } from './replay';
 import { SettingsScreen } from './settings';
 
 type Phase = 'intro' | 'play' | 'paused' | 'dead' | 'rewind' | 'won';
 
-/** Real seconds: the freeze after each shatter, after the Manager's, the beat after the last kill (longer
- *  for the boss), and how long a death holds before any text covers it. */
+/** Real seconds: the freeze after each shatter, after a boss's, the beat after the last kill (longer for a
+ *  boss), and how long a death holds before any text covers it. */
 const HIT_STOP = 0.05;
 const BOSS_STOP = 1.0;
 const WON_HOLD = 0.7;
 const BOSS_WON_HOLD = 1.8;
 const DEATH_HOLD = 0.6;
+
+/** A run of levels (the Gauntlet): what happens when one is won or lost, instead of the replay or a retry. */
+export interface PlayRun {
+  /** waves before this level's first, so the banner counts the whole run */
+  waveOffset: number;
+  won(screen: PlayScreen): void;
+  lost(screen: PlayScreen): void;
+}
 
 export class PlayScreen implements Screen {
   readonly name = 'play';
@@ -52,7 +62,7 @@ export class PlayScreen implements Screen {
   phase: Phase = 'intro';
   /** every TickInput so far, for the replay */
   rec: TickInput[] = [];
-  private snaps: { tick: number; world: World }[] = [];
+  private snaps: RewindBuffer | null = null;
   rewinds = 0;
   private q = { fire: false, alt: false, pick: 0, swap: false, dash: false };
   private phaseT = 0;
@@ -60,10 +70,15 @@ export class PlayScreen implements Screen {
   private waveBanner = { label: '', t: 9 };
   /** real seconds of hit-stop left */
   private stopT = 0;
-  /** real seconds since the Manager shattered (-1: not yet) */
+  /** real seconds since a boss shattered (-1: not yet), and its name */
   private bossT = -1;
+  private bossName = '';
   /** the red that got you */
   private killer = 0;
+  /** what killed you when it wasn't a red: a train, the hook, the beat */
+  private killedBy: Hazard | undefined;
+  /** what this level shows for the first time, for the intro card */
+  private news: string[];
   private coinsShown = 0;
   private ticksThisSecond = 0;
   private tps = 0;
@@ -76,13 +91,16 @@ export class PlayScreen implements Screen {
 
   constructor(
     private app: App,
-    levelId: string,
+    level: string | LevelDef,
     skipIntro = false,
+    /** the run this level belongs to (the Gauntlet), which takes over at a clear or a death */
+    readonly run: PlayRun | null = null,
   ) {
-    this.def = levelById(levelId);
+    this.def = typeof level === 'string' ? levelById(level) : level;
+    this.news = run ? [] : newIn(this.def.id);
     this.mods = app.mods();
     this.world = createWorld(this.def, this.mods);
-    this.time = createTime(this.mods.stride, this.mods.trigger);
+    this.time = createTime(this.mods.stride, this.mods.trigger, this.def.glitch === 'inverse');
     this.fx = new Fx(app.atlas);
     this.art = new LevelArt(this.def);
     this.rewinds = TIER_VALUES.rewindCharges[this.mods.rewind];
@@ -90,14 +108,25 @@ export class PlayScreen implements Screen {
     app.sound.playing = true;
   }
 
+  private get keys() {
+    return this.app.save.settings.keys;
+  }
+
   private begin() {
     this.phase = 'play';
     this.cursor = 'aim';
-    this.snaps = [{ tick: 0, world: cloneWorld(this.world) }];
+    this.snaps = newRewind(this.world);
   }
 
   restart() {
-    this.app.goto(new PlayScreen(this.app, this.def.id, true));
+    if (this.run) this.run.lost(this);
+    else this.app.goto(new PlayScreen(this.app, this.def.id, true));
+  }
+
+  /** Leaving for the map (or, in a run, ending it). */
+  private quit() {
+    if (this.run) this.run.lost(this);
+    else this.app.goto(new MapScreen(this.app, this.def.id));
   }
 
   /** The cursor as a point in the world: the floor under it, and the chest-height point it aims at. */
@@ -114,8 +143,7 @@ export class PlayScreen implements Screen {
   /** The item under the cursor, and whether it is out of reach. A red under the cursor wins: you meant it. */
   private hoverItem(): { id: number; far: boolean } {
     const c = this.cursorWorld(), w = this.world, p = w.player;
-    const tall = { grunt: 22, gunner: 22, brute: 30, manager: 36 };
-    if (w.reds.some((r) => !r.dead && Math.abs(c.x - r.x) <= r.r + 2 && c.y <= r.y + 3 && c.y >= r.y - tall[r.kind])) return { id: 0, far: false };
+    if (w.reds.some((r) => !r.dead && Math.abs(c.x - r.x) <= r.r + 2 && c.y <= r.y + 3 && c.y >= r.y - REDS[r.kind].tall)) return { id: 0, far: false };
     let best = 0, bestD = 8, far = false;
     for (const it of w.items) {
       const d = Math.hypot(it.x - c.x, it.y - c.y);
@@ -136,20 +164,16 @@ export class PlayScreen implements Screen {
 
   private move() {
     if (this.bot && this.botNext) return { x: this.botNext.mx, y: this.botNext.my };
-    const i = this.app.input;
+    const i = this.app.input, k = this.keys;
     const axis = (neg: string, negAlt: string, pos: string, posAlt: string) =>
       (i.down(pos) || i.down(posAlt) ? 1 : 0) - (i.down(neg) || i.down(negAlt) ? 1 : 0);
-    return { x: axis('KeyA', 'ArrowLeft', 'KeyD', 'ArrowRight'), y: axis('KeyW', 'ArrowUp', 'KeyS', 'ArrowDown') };
+    return { x: axis(k.left, 'ArrowLeft', k.right, 'ArrowRight'), y: axis(k.up, 'ArrowUp', k.down, 'ArrowDown') };
   }
 
   scale(realDt: number): number {
-    const inp = this.app.input;
+    const inp = this.app.input, k = this.keys;
     this.phaseT += realDt;
-    if (this.phase === 'intro') {
-      if (inp.pressed('Escape')) this.app.goto(new MapScreen(this.app, this.def.id));
-      else if (inp.pressed('Mouse0') || inp.pressed('Space') || inp.pressed('Enter')) this.begin();
-      return 0;
-    }
+    if (this.phase === 'intro') return 0;
     if (this.phase === 'paused') return 0;
     if (this.phase === 'rewind') {
       if (this.phaseT > REWIND.realSeconds) {
@@ -159,17 +183,20 @@ export class PlayScreen implements Screen {
       return 0;
     }
     if (this.phase === 'won') {
-      if (this.phaseT > (this.bossT >= 0 ? BOSS_WON_HOLD : WON_HOLD)) this.app.goto(new ReplayScreen(this.app, this));
+      if (this.phaseT > (this.bossT >= 0 ? BOSS_WON_HOLD : WON_HOLD)) {
+        if (this.run) this.run.won(this);
+        else this.app.goto(new ReplayScreen(this.app, this));
+      }
       return 0;
     }
     if (this.phase === 'dead') {
       this.fx.tick(realDt * 0.3, this.world);
-      if (inp.pressed('KeyR') || (this.phaseT > DEATH_HOLD && (inp.pressed('Mouse0') || inp.pressed('Space') || inp.pressed('Enter')))) this.restart();
-      else if (inp.pressed('Escape')) this.app.goto(new MapScreen(this.app, this.def.id));
+      if (inp.pressed(k.restart) || (this.phaseT > DEATH_HOLD && (inp.pressed('Mouse0') || inp.pressed('Space') || inp.pressed('Enter')))) this.restart();
+      else if (inp.pressed('Escape')) this.quit();
       return 0;
     }
     // playing
-    if (inp.pressed('KeyR')) {
+    if (inp.pressed(k.restart)) {
       this.restart();
       return 0;
     }
@@ -195,13 +222,13 @@ export class PlayScreen implements Screen {
       else if (hover.far) {
         // a click on something out of reach does nothing (it used to throw what you held)
         const it = w.items.find((i) => i.id === hover.id);
-        if (it) this.fx.popup('TOO FAR', it.x, it.y - 10, PAL.slate);
+        if (it) this.fx.popup('Too far', it.x, it.y - 10, PAL.iron);
       } else this.q.fire = true;
     }
     if (inp.pressed('Mouse2') && p.hands.length) this.q.alt = true;
-    if (inp.pressed('KeyE') && pickTarget(w, -1)) this.q.pick = -1;
-    if ((inp.pressed('KeyQ') || inp.pressed('WheelUp') || inp.pressed('WheelDown')) && p.hands.length === 2) this.q.swap = true;
-    if (inp.pressed('Space') && this.mods.frameskip > 0 && p.dashCd <= 0) {
+    if (inp.pressed(k.pick) && pickTarget(w, -1)) this.q.pick = -1;
+    if ((inp.pressed(k.swap) || inp.pressed('WheelUp') || inp.pressed('WheelDown')) && p.hands.length === 2) this.q.swap = true;
+    if (inp.pressed(k.dash) && this.mods.frameskip > 0 && p.dashCd <= 0) {
       // Frameskip takes no game time: run its tick right now, whatever the time rule says
       this.q.dash = true;
       this.tick();
@@ -247,11 +274,7 @@ export class PlayScreen implements Screen {
     spendBurst(this.time, 1 / TICK_RATE);
     this.fx.tick(1 / TICK_RATE, w);
     for (const e of events) this.onEvent(e);
-    if (w.tick % Math.round(REWIND.every * TICK_RATE) === 0 && w.status === 'play') {
-      this.snaps.push({ tick: w.tick, world: cloneWorld(w) });
-      const keep = Math.round(REWIND.keep / REWIND.every) + 1;
-      if (this.snaps.length > keep) this.snaps.shift();
-    }
+    if (this.snaps) keepSnap(this.snaps, w);
   }
 
   private onEvent(e: SimEvent) {
@@ -260,27 +283,36 @@ export class PlayScreen implements Screen {
     this.fx.event(e, w);
     const st = this.app.save.settings;
     if (e.t === 'shatter') {
-      if (st.shake) shake(this.cam, e.kind === 'manager' ? 4 : 2, 0.15);
-      if (e.kind === 'manager') {
+      // the Frame is its eyes: it breaks with the last of them
+      const frame = e.kind === 'eye' && !w.reds.some((r) => r.kind === 'eye' && !r.dead);
+      const boss = !!REDS[e.kind].boss || frame;
+      if (st.shake) shake(this.cam, boss ? 4 : 2, 0.15);
+      if (boss) {
         this.bossT = 0;
+        this.bossName = frame ? 'The Frame' : REDS[e.kind].name;
         this.stopT = BOSS_STOP;
         this.fx.flash = 0.15;
       } else this.stopT = Math.max(this.stopT, HIT_STOP);
     }
+    if ((e.t === 'land' || e.t === 'drop') && st.shake) shake(this.cam, e.t === 'land' ? 4 : 2, 0.2);
+    if (e.t === 'train' && st.shake) shake(this.cam, 1, 0.5);
     if (e.t === 'phase') this.waveBanner = { label: `PHASE ${e.n + 1}`, t: 0 };
     if (e.t === 'wave') {
       // the help a boss phase calls in keeps the PHASE banner
       const phase = this.waveBanner.t === 0 && this.waveBanner.label.startsWith('PHASE');
-      if (e.n > 1 && !phase) this.waveBanner = { label: `WAVE ${e.n}`, t: 0 };
+      // a run's arenas start empty, so their first wave through the doors is wave 1, not 2
+      const n = this.run ? e.n - 1 + this.run.waveOffset : e.n;
+      if ((e.n > 1 || this.run) && !phase) this.waveBanner = { label: `WAVE ${n}`, t: 0 };
       if (this.mods.rewind >= 3) this.rewinds = TIER_VALUES.rewindCharges[this.mods.rewind];
     }
     if (e.t === 'death') {
-      if (this.rewinds > 0 && this.snaps.length) this.rewind();
+      if (this.rewinds > 0 && this.snaps) this.rewind();
       else {
         this.phase = 'dead';
         this.phaseT = 0;
         this.cursor = 'pointer';
         this.killer = e.by;
+        this.killedBy = e.what;
         this.app.save.deaths++;
         this.app.persist();
         if (st.shake) shake(this.cam, 4, 0.3);
@@ -297,14 +329,7 @@ export class PlayScreen implements Screen {
 
   /** Rewind: back to the snapshot about 2 game seconds ago; the replay forgets what was undone. */
   private rewind() {
-    const target = this.world.tick - Math.round(REWIND.back * TICK_RATE);
-    let snap = this.snaps[0];
-    for (const s of this.snaps) if (s.tick <= target) snap = s;
-    const used = this.world.stats.rewinds + 1;
-    this.world = cloneWorld(snap.world);
-    this.world.stats.rewinds = used;
-    this.rec.length = snap.tick;
-    this.snaps = this.snaps.filter((s) => s.tick <= snap.tick);
+    this.world = rewind(this.snaps!, this.world, this.rec);
     this.rewinds--;
     this.phase = 'rewind';
     this.phaseT = 0;
@@ -317,7 +342,7 @@ export class PlayScreen implements Screen {
   }
 
   frame(realDt: number, alpha: number) {
-    const ctx = this.app.display.ctx, w = this.world, p = w.player;
+    const ctx = this.app.world, ui = this.app.ui, w = this.world, p = w.player;
     const m = this.app.input.mouse;
     const px = p.px + (p.x - p.px) * alpha, py = p.py + (p.y - p.py) * alpha;
     followCamera(this.cam, w, px, py, this.phase === 'play' ? m.x : VIEW.w / 2, this.phase === 'play' ? m.y : VIEW.h / 2, realDt, this.realTime === 0 && this.phase !== 'play');
@@ -333,14 +358,16 @@ export class PlayScreen implements Screen {
       this.fx.arrived = 0;
     }
     drawScene(ctx, w, this.art, this.app.atlas, this.fx, this.cam, alpha, {
-      aim: this.phase === 'play' ? this.aim() : p.aim, hoverItem: this.phase === 'play' ? this.hover : 0, now: this.app.now, showPlayer: true, aimReach: this.phase === 'play' ? this.aimReach() : 0,
+      aim: this.phase === 'play' ? this.aim() : p.aim, hoverItem: this.phase === 'play' ? this.hover : 0, now: this.app.now, showPlayer: true,
+      aimReach: this.phase === 'play' ? this.aimReach() : 0, ui: ui.ctx, outline: this.app.save.settings.outline, calm: this.app.save.settings.flash, strobe: !!this.def.strobe,
     });
     if (this.fx.flash > 0 && !this.app.save.settings.flash) dither(ctx, 0, 0, VIEW.w, VIEW.h, PAL.paper);
+    ui.begin();
     if (this.phase !== 'intro') {
-      drawHud(ctx, w, this.app.atlas, {
-        levelId: this.def.id, levelName: this.def.name, time: this.time, rewinds: this.rewinds, coinsShown: this.coinsShown,
+      drawHud(ui, w, this.app.atlas, {
+        levelId: this.run ? 'Gauntlet' : this.def.id, levelName: this.run ? `${this.def.name} · wave ${this.run.waveOffset + Math.max(1, w.waves.next)}` : this.def.name, time: this.time, rewinds: this.rewinds, coinsShown: this.coinsShown,
         waveBanner: this.waveBanner, hint: this.phase === 'play' ? this.hint() : '', now: this.app.now,
-        avoid: this.bodiesOnScreen(alpha),
+        avoid: this.bodiesOnScreen(alpha), keys: { swap: keyLabel(this.keys.swap), dash: keyLabel(this.keys.dash) },
       });
     }
     if (this.phase === 'intro') this.drawIntro();
@@ -350,6 +377,7 @@ export class PlayScreen implements Screen {
     else if (this.phase === 'won') this.drawWon();
     if (this.bossT >= 0 && this.bossT < BOSS_WON_HOLD) this.drawBossCard();
     if (this.app.debug) this.drawDebug();
+    ui.end();
   }
 
   /** From you to the cursor, in world pixels. */
@@ -366,70 +394,87 @@ export class PlayScreen implements Screen {
       out.push({ x: x - wide / 2, y: y - tall, w: wide, h: tall + 3 });
     };
     add(w.player, 24, 14);
-    for (const r of w.reds) add(r, r.kind === 'manager' ? 40 : r.kind === 'brute' ? 34 : 26, r.kind === 'grunt' || r.kind === 'gunner' ? 14 : 24);
+    for (const r of w.reds) add(r, REDS[r.kind].tall + 4, Math.max(14, r.r * 3.5));
     return out;
   }
 
-  /** Tutorial lines for the first levels, depending on what you've done so far. */
+  /** Tutorial lines for the first levels of each chapter, depending on what you've done so far. */
   private hint(): string {
-    const w = this.world, p = w.player, id = this.def.id;
+    const w = this.world, p = w.player, id = this.def.id, k = this.keys;
+    const keys = `[${keyLabel(k.up)}][${keyLabel(k.left)}][${keyLabel(k.down)}][${keyLabel(k.right)}]`;
     if (id === '1-1') {
-      if (!this.moved) return 'WASD MOVES. TIME MOVES ONLY WHEN YOU DO.';
-      if (!p.hands.length && w.items.some((i) => i.kind === 'pistol') && w.stats.pickups === 0) return 'CLICK THE PISTOL TO PICK IT UP';
-      if (p.hands[0] && ITEMS[p.hands[0].kind].gun && w.stats.shots === 0) return 'AIM WITH THE MOUSE. CLICK TO SHOOT.';
-      if (w.stats.kills === 0 && w.tick > 240) return 'STAND STILL TO THINK. WATCH THE RED LINES.';
-      if (p.hands[0] && p.hands[0].ammo === 0) return 'EMPTY? CLICK TO THROW IT. THEN PUNCH.';
+      if (!this.moved) return `${keys} move. *Time moves only when you do.*`;
+      if (!p.hands.length && w.items.some((i) => i.kind === 'pistol') && w.stats.pickups === 0) return '[LMB] the *pistol* to pick it up';
+      if (p.hands[0] && ITEMS[p.hands[0].kind].gun && w.stats.shots === 0) return 'Aim with the mouse. [LMB] shoots.';
+      if (w.stats.kills === 0 && w.tick > 240) return 'Stand still to think. Watch the *red lines*.';
+      if (p.hands[0] && p.hands[0].ammo === 0) return 'Empty? [LMB] throws it. Then punch.';
       return '';
     }
-    if (id === '1-2' && w.stats.punches === 0 && !p.hands.length) return 'NO GUN? CLICK UP CLOSE TO PUNCH. A PUNCH KNOCKS A GUN LOOSE.';
-    if (id === '1-3' && w.stats.throws === 0) return 'RIGHT CLICK THROWS WHAT YOU HOLD. E PICKS UP.';
-    if (id === '1-5' && w.tick < 180) return 'MORE COME THROUGH THE DOORS.';
-    if (id === '1-8' && w.tick < 240) return 'SHOOT A DESK IN THE AIR TO BREAK IT.';
-    return '';
+    if (id === '1-2' && w.stats.punches === 0 && !p.hands.length) return 'No gun? [LMB] up close to *punch*. A punch knocks a gun loose.';
+    if (id === '1-3' && w.stats.throws === 0) return `[RMB] *throws* what you hold. [${keyLabel(k.pick)}] picks up.`;
+    if (id === '1-5' && w.tick < 180) return 'More come through the *doors*.';
+    if (id === '1-8' && w.tick < 240) return 'Shoot a *desk* in the air to break it.';
+    return this.def.hint && w.tick < 300 ? this.def.hint : '';
   }
 
   private drawIntro() {
-    const ctx = this.app.display.ctx, ui = this.app.ui, d = this.def;
-    ui.begin();
-    ui.dim();
-    const x = 40, y = 22, w = 240, h = 132;
-    ui.panel(x, y, w, h);
-    drawText(ctx, `LEVEL ${d.id}`, x + 8, y + 7, PAL.slate);
-    const goal = d.goal.kind === 'clear' ? 'SHATTER EVERY RED' : d.goal.kind === 'escape' ? 'REACH THE EXIT' : `SURVIVE ${d.goal.seconds} SECONDS`;
-    drawText(ctx, goal, x + w - 8 - goal.length * 4 + 1, y + 7, PAL.hot);
-    centerBig(ctx, d.name, VIEW.w / 2, y + 18, PAL.paper, 2);
+    const ui = this.app.ui, ctx = ui.ctx, d = this.def, inp = this.app.input;
+    ui.veil();
+    const w = 420, tipLines = richLines(d.tip, w - 48).length;
+    const news = this.news.length ? 24 : 0;
+    const h = 214 + tipLines * 15 + news, x = (UI.w - w) / 2, y = Math.round((UI.h - h) / 2);
+    ui.card(x, y, w, h);
+    ui.chip(x + 12, y + 12, `Level ${d.id}`, PAL.fog);
+    const goal = d.goal.kind === 'clear' ? 'Shatter every red' : d.goal.kind === 'escape' ? 'Reach the exit' : `Survive ${d.goal.seconds} seconds`;
+    const gw = measure(goal) + 8;
+    ui.chip(x + w - 12 - gw, y + 12, goal, d.goal.kind === 'clear' ? PAL.red : PAL.cyan, d.goal.kind === 'clear' ? PAL.paper : PAL.ink);
+    text(ctx, d.name.toUpperCase(), UI.w / 2, y + 36, PAL.ink, { face: 'shard', scale: measure(d.name.toUpperCase(), 'shard', 2) > w - 24 ? 1 : 2, align: 'center' });
+    rect(ctx, x + 12, y + 68, w - 24, 1, PAL.fog);
     const rec = record(this.app.save, d.id);
-    const rows: [string, string, number][] = [['CLEAR', 'FINISH THE LEVEL', 0], ['PAR', `UNDER ${d.par} GAME SECONDS`, 1], ['CHALLENGE', d.challengeText, 2]];
-    rows.forEach(([a, b, i], k) => {
-      const ry = y + 42 + k * 11;
-      star(ctx, x + 10, ry - 1, rec.stars[i]);
-      drawText(ctx, a, x + 22, ry, PAL.stone);
-      drawText(ctx, b, x + 66, ry, PAL.fog);
+    const rows: [string, string][] = [['Clear', 'Finish the level'], ['Par', d.goal.kind === 'survive' ? 'Comes with surviving' : `Under ${d.par} game seconds`], ['Challenge', d.challengeText]];
+    rows.forEach(([a, b], i) => {
+      const ry = y + 78 + i * 20;
+      bigStar(ctx, x + 16, ry - 3, rec.stars[i]);
+      text(ctx, a, x + 36, ry, PAL.ink);
+      text(ctx, b, x + 112, ry, PAL.iron);
     });
-    const tip = wrap(d.tip, w - 20);
-    tip.forEach((l, i) => centerText(ctx, l, VIEW.w / 2, y + 80 + i * 7, PAL.cyan));
-    if (rec.best) centerText(ctx, `BEST ${(rec.best / TICK_RATE).toFixed(1)} S`, VIEW.w / 2, y + 98, PAL.slate);
-    if (ui.button('start', VIEW.w / 2 - 40, y + h - 22, 80, 14, 'START', { primary: true })) this.begin();
-    if (ui.button('back', x + 6, y + h - 20, 34, 11, 'MAP')) this.app.goto(new MapScreen(this.app, d.id));
-    drawText(ctx, 'ESC', x + w - 20, y + h - 17, PAL.iron);
-    ui.end();
+    // the tip, on a tinted strip with a cyan edge
+    const th = 14 + tipLines * 15;
+    rect(ctx, x + 12, y + 142, w - 24, th, PAL.fog);
+    rect(ctx, x + 12, y + 142, 3, th, PAL.cyan);
+    rich(ctx, d.tip, x + 24, y + 151, { color: PAL.ink, accent: PAL.tide, maxW: w - 48 });
+    if (news) {
+      // what's new here, on red chips: the first time you meet it
+      let nx = x + 12;
+      const ny = y + 150 + th;
+      text(ctx, 'New', nx, ny + 3, PAL.iron);
+      nx += measure('New') + 8;
+      for (const n of this.news) {
+        ui.chip(nx, ny, n, PAL.red, PAL.paper);
+        nx += measure(n) + 14;
+      }
+    }
+    if (rec.best) text(ctx, `Best ${(rec.best / TICK_RATE).toFixed(1)} s`, x + 12, y + h - 58, PAL.tide);
+    if (ui.button('back', x + 12, y + h - 40, 110, 28, 'Map', { cap: 'Esc', key: 'Escape' })) this.app.goto(new MapScreen(this.app, d.id));
+    const go = ui.button('start', x + w - 182, y + h - 40, 170, 28, 'Start', { kind: 'primary', cap: 'Space' });
+    if (go || inp.pressed('Space') || inp.pressed('Enter')) this.begin();
   }
 
   private drawPause() {
-    const ctx = this.app.display.ctx, ui = this.app.ui;
-    ui.begin();
-    ui.dim();
-    ui.panel(100, 40, 120, 100);
-    centerBig(ctx, 'PAUSED', VIEW.w / 2, 48, PAL.paper);
-    const resume = ui.button('resume', 115, 64, 90, 14, 'RESUME', { primary: true }) || this.app.input.pressed('Escape');
+    const ui = this.app.ui;
+    ui.veil();
+    const w = 240, h = 196, x = (UI.w - w) / 2, y = (UI.h - h) / 2;
+    ui.card(x, y, w, h);
+    ui.text('PAUSED', UI.w / 2, y + 14, PAL.ink, { face: 'shard', align: 'center' });
+    const bx = x + 20, bw = w - 40;
+    const resume = ui.button('resume', bx, y + 40, bw, 28, 'Resume', { kind: 'primary', cap: 'Esc' }) || this.app.input.pressed('Escape');
     if (resume) {
       this.phase = 'play';
       this.cursor = 'aim';
     }
-    if (ui.button('restart', 115, 82, 90, 14, 'RESTART (R)')) this.restart();
-    if (ui.button('settings', 115, 100, 90, 14, 'SETTINGS')) this.app.goto(new SettingsScreen(this.app, this));
-    if (ui.button('quit', 115, 118, 90, 14, 'QUIT TO MAP')) this.app.goto(new MapScreen(this.app, this.def.id));
-    ui.end();
+    if (ui.button('restart', bx, y + 76, bw, 28, this.run ? 'Give up' : 'Restart', { cap: keyLabel(this.keys.restart) })) this.restart();
+    if (ui.button('settings', bx, y + 112, bw, 28, 'Settings')) this.app.goto(new SettingsScreen(this.app, this));
+    if (ui.button('quit', bx, y + 148, bw, 28, this.run ? 'End the run' : 'Quit to map')) this.quit();
   }
 
   /** Back from the settings screen. */
@@ -438,9 +483,9 @@ export class PlayScreen implements Screen {
     this.app.applySettings();
   }
 
-  /** Death: first just look (what got you is marked, the room stays frozen), then a strip at the top. */
+  /** Death: first just look (what got you is marked, the room stays frozen), then a card at the top. */
   private drawDead() {
-    const ctx = this.app.display.ctx, w = this.world, t = this.phaseT;
+    const ctx = this.app.world, ui = this.app.ui, w = this.world, t = this.phaseT;
     const k = w.reds.find((r) => r.id === this.killer && !r.dead);
     if (k && t > 0.2) {
       const kx = k.x - this.cam.x, ky = k.y - this.cam.y - 10;
@@ -448,40 +493,47 @@ export class PlayScreen implements Screen {
       ring(ctx, kx, ky, k.r + 7 + (Math.floor(t * 6) % 2), PAL.red);
     }
     if (t < DEATH_HOLD) return;
-    rect(ctx, 0, 0, VIEW.w, 21, PAL.ink);
-    rect(ctx, 0, 21, VIEW.w, 1, PAL.wine);
-    const by = k ? `BY ${k.kind === 'manager' ? '' : 'A '}${REDS[k.kind].name}` : '';
+    const hazard = { train: 'by a train', hook: 'by the hook', beat: 'on the beat', landing: '' }[this.killedBy ?? 'landing'];
+    const by = k ? `by ${REDS[k.kind].boss ? '' : 'a '}${REDS[k.kind].name}` : hazard;
     const title = 'SHATTERED';
-    const tw = bigWidth(title) + (by ? textWidth(by) + 6 : 0);
-    const x = Math.round((VIEW.w - tw) / 2);
-    drawBig(ctx, title, x, 3, PAL.red);
-    if (by) drawText(ctx, by, x + bigWidth(title) + 6, 5, PAL.hot);
-    centerText(ctx, 'R OR CLICK: TRY AGAIN    ESC: MAP', VIEW.w / 2, 13, Math.floor(t * 2) % 2 ? PAL.fog : PAL.stone);
+    const keys = this.run ? `[${keyLabel(this.keys.restart)}] or [LMB] see how you did` : `[${keyLabel(this.keys.restart)}] or [LMB] try again    [Esc] map`;
+    const tw = measure(title, 'shard') + (by ? measure(by) + 10 : 0);
+    const cw = Math.max(tw, measure(keys) + 40) + 32, x = Math.round((UI.w - cw) / 2), y = 10;
+    plate(ui.ctx, x, y, cw, 50, PAL.ink, PAL.stone);
+    rect(ui.ctx, x + 1, y + 1, cw - 2, 48, PAL.paper);
+    rect(ui.ctx, x + 1, y + 1, cw - 2, 3, PAL.red);
+    const tx = Math.round((UI.w - tw) / 2);
+    text(ui.ctx, title, tx, y + 10, PAL.blood, { face: 'shard' });
+    if (by) text(ui.ctx, by, tx + measure(title, 'shard') + 10, y + 13, PAL.iron);
+    rich(ui.ctx, keys, UI.w / 2, y + 32, { color: Math.floor(t * 2) % 2 ? PAL.ink : PAL.iron, align: 'center' });
   }
 
   /** The beat after the last kill: a quiet word up top while the shards hang. */
   private drawWon() {
     if (this.phaseT < 0.25 || this.bossT >= 0) return;
-    const ctx = this.app.display.ctx, d = this.def;
+    const ui = this.app.ui, d = this.def;
     const word = d.goal.kind === 'escape' ? 'ESCAPED' : d.goal.kind === 'survive' ? 'SURVIVED' : 'CLEARED';
-    const tw = bigWidth(word) + 12, x = Math.round((VIEW.w - tw) / 2);
-    rect(ctx, x, 20, tw, 11, PAL.ink);
-    centerBig(ctx, word, VIEW.w / 2, 22, PAL.cyan);
+    const tw = measure(word, 'shard') + 28, x = Math.round((UI.w - tw) / 2), y = 32;
+    plate(ui.ctx, x, y, tw, 25, PAL.ink, PAL.stone);
+    rect(ui.ctx, x + 1, y + 1, tw - 2, 23, PAL.paper);
+    rect(ui.ctx, x + 1, y + 21, tw - 2, 3, PAL.cyan);
+    ui.text(word, UI.w / 2, y + 6, PAL.ink, { face: 'shard', align: 'center' });
   }
 
-  /** The Manager breaks: the room stops, a white flash, and its name. */
+  /** A boss breaks: the room stops, a white flash, and its name across the screen. */
   private drawBossCard() {
-    const ctx = this.app.display.ctx, t = this.bossT;
+    const ui = this.app.ui, ctx = ui.ctx, t = this.bossT;
     if (t < 0.2) return;
-    rect(ctx, 0, 24, VIEW.w, 30, PAL.ink);
-    rect(ctx, 0, 24, VIEW.w, 1, PAL.wine);
-    rect(ctx, 0, 53, VIEW.w, 1, PAL.wine);
-    centerBig(ctx, 'THE MANAGER', VIEW.w / 2, 28, PAL.paper);
-    if (t > 0.5) centerBig(ctx, 'SHATTERED', VIEW.w / 2, 39, PAL.red);
+    const y = 54;
+    rect(ctx, 0, y, UI.w, 70, PAL.ink);
+    rect(ctx, 0, y + 2, UI.w, 66, PAL.paper);
+    rect(ctx, 0, y + 64, UI.w, 4, PAL.red);
+    text(ctx, this.bossName.toUpperCase(), UI.w / 2, y + 10, PAL.ink, { face: 'shard', scale: 2, align: 'center' });
+    if (t > 0.5) text(ctx, 'SHATTERED', UI.w / 2, y + 44, PAL.blood, { face: 'shard', align: 'center' });
   }
 
   private drawRewind() {
-    const ctx = this.app.display.ctx;
+    const ctx = this.app.world, ui = this.app.ui;
     // VHS: rows slip sideways, a band rolls up the screen
     const t = this.phaseT;
     for (let y = 0; y < VIEW.h; y += 3) {
@@ -491,21 +543,23 @@ export class PlayScreen implements Screen {
     }
     const band = VIEW.h - ((t / REWIND.realSeconds) * (VIEW.h + 20)) % (VIEW.h + 20);
     dither(ctx, 0, band, VIEW.w, 6, PAL.tide);
-    drawText(ctx, '<< REWIND', 10, 24, PAL.cyan, 2);
+    // two back-arrows and the word
+    for (let k = 0; k < 2; k++) for (let j = 0; j < 11; j++) rect(ui.ctx, 22 + k * 12 + Math.abs(j - 5), 50 + j, 6 - Math.abs(j - 5), 1, PAL.tide);
+    ui.text('REWIND', 50, 50, PAL.tide, { face: 'shard', outline: PAL.paper });
   }
 
   private drawDebug() {
-    const ctx = this.app.display.ctx, w = this.world;
+    const ui = this.app.ui, w = this.world;
     const lines = [
-      `SCALE ${this.time.scale.toFixed(3)}`,
-      `TICKS/S ${this.tps.toFixed(1)}`,
-      `BURST ${this.time.burst.toFixed(3)}`,
-      `GAME ${(w.tick / TICK_RATE).toFixed(2)} S`,
-      `REAL ${this.realTime.toFixed(2)} S`,
-      `REDS ${w.reds.length} BULLETS ${w.bullets.length}`,
-      `SHARDS ${this.fx.shards.length}`,
+      `Scale ${this.time.scale.toFixed(3)}`,
+      `Ticks/s ${this.tps.toFixed(1)}`,
+      `Burst ${this.time.burst.toFixed(3)}`,
+      `Game ${(w.tick / TICK_RATE).toFixed(2)} s`,
+      `Real ${this.realTime.toFixed(2)} s`,
+      `Reds ${w.reds.length} · bullets ${w.bullets.length}`,
+      `Shards ${this.fx.shards.length}`,
     ];
-    rect(ctx, 2, 30, 92, lines.length * 7 + 4, PAL.ink);
-    lines.forEach((l, i) => drawText(ctx, l, 4, 32 + i * 7, PAL.cyan));
+    ui.card(6, 76, 150, lines.length * 12 + 10, { fill: PAL.paper });
+    lines.forEach((l, i) => ui.text(l, 12, 82 + i * 12, PAL.tide));
   }
 }

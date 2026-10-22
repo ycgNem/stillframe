@@ -2,7 +2,9 @@
 
 - held_<kind>: 16 pre-drawn angles (never rotated at runtime), pivot at the grip / the hand.
 - item_<kind>: lying on the floor, pivot at its centre.
-- thrown_desk: the Manager's desk tumbling through the air, 4 frames.
+- thrown_desk, thrown_beam, thrown_record: what the bosses lob (the Manager's desk, the Foreman's steel
+  beam, the DJ's records), tumbling through the air, 4 frames each. Greys and coal, never ink: you can't
+  pick them up.
 - coin: the 4-frame spin from the style key.
 
 Shapes are built from lines along the aim, so each angle is drawn, not resampled: no mixed pixel density.
@@ -71,6 +73,42 @@ def gun(s, a, length, width, grip, stock=0):
     top_light(s)
 
 
+def smg(s, a):
+    """Short and boxy, with a magazine forward of the grip."""
+    gun(s, a, 7, 4, 3)
+    cx = cy = PIV
+    ux, uy = math.cos(a), math.sin(a)
+    side = 1 if ux >= 0 else -1
+    gx, gy = -uy * side, ux * side
+    if gy < 0:
+        gx, gy = -gx, -gy
+    thick_line(s, cx + ux * 3.5, cy + uy * 3.5, cx + ux * 3.5 + gx * 3.5, cy + uy * 3.5 + gy * 3.5, 2, C.ink)
+
+
+def rifle(s, a):
+    """Long and thin, a stock behind the hand and a scope on top."""
+    gun(s, a, 11, 2, 2, stock=3)
+    cx = cy = PIV
+    ux, uy = math.cos(a), math.sin(a)
+    side = 1 if ux >= 0 else -1
+    gx, gy = -uy * side, ux * side
+    if gy < 0:
+        gx, gy = -gx, -gy
+    # the scope sits on the side away from the grip
+    sx, sy = cx + ux * 4 - gx * 1.4, cy + uy * 4 - gy * 1.4
+    thick_line(s, sx - ux * 2, sy - uy * 2, sx + ux * 2, sy + uy * 2, 2.4, C.ink)
+
+
+def katana(s, a):
+    """A long thin blade with a square guard; the edge catches the light along its length."""
+    cx = cy = PIV
+    ux, uy = math.cos(a), math.sin(a)
+    thick_line(s, cx - ux * 3, cy - uy * 3, cx + ux * 1, cy + uy * 1, 2, C.ink)
+    thick_line(s, cx + ux * 1 - uy * 1.6, cy + uy * 1 + ux * 1.6, cx + ux * 1 + uy * 1.6, cy + uy * 1 - ux * 1.6, 2, C.iron)
+    s.line(round(cx + ux * 2), round(cy + uy * 2), round(cx + ux * 10), round(cy + uy * 10), C.ink)
+    s.line(round(cx + ux * 5), round(cy + uy * 5), round(cx + ux * 7), round(cy + uy * 7), C.slate)
+
+
 def bottle(s, a):
     cx = cy = PIV
     ux, uy = math.cos(a), math.sin(a)
@@ -110,6 +148,9 @@ def ashtray(s, a):
 DRAW = {
     "pistol": lambda s, a: gun(s, a, 6, 3, 3),
     "shotgun": lambda s, a: gun(s, a, 9, 3, 2, stock=3),
+    "smg": smg,
+    "rifle": rifle,
+    "katana": katana,
     "bottle": bottle,
     "mug": mug,
     "keyboard": keyboard,
@@ -128,7 +169,7 @@ def held(kind):
 
 def floor_item(kind):
     s = sprite(CELL, CELL)
-    DRAW[kind](s, -0.35 if kind in ("pistol", "shotgun") else 0)
+    DRAW[kind](s, -0.35 if kind in ("pistol", "shotgun", "smg", "rifle", "katana") else 0)
     return check(s, f"item_{kind}")
 
 
@@ -148,6 +189,41 @@ def desk_frames():
             s.rect(4, 7, 19, 15, C.stone).rect(4, 7, 19, 7, C.ash)
             s.rect(5, 3, 6, 7, C.slate).rect(17, 3, 18, 7, C.slate).rect(5, 15, 6, 19, C.slate).rect(17, 15, 18, 19, C.slate)
         out.append(check(s, f"thrown_desk_{f}"))
+    return out, W
+
+
+def beam_frames():
+    """The Foreman's steel I-beam, tumbling end over end."""
+    out = []
+    W = 24
+    for f in range(4):
+        s = sprite(W, W)
+        a = f * math.pi / 4
+        ux, uy = math.cos(a), math.sin(a) * 0.6
+        c = W / 2
+        thick_line(s, c - ux * 9, c - uy * 9, c + ux * 9, c + uy * 9, 5, C.iron)
+        thick_line(s, c - ux * 9, c - uy * 9 - 1, c + ux * 9, c + uy * 9 - 1, 2, C.slate)
+        thick_line(s, c - ux * 8, c - uy * 8 + 1, c + ux * 8, c + uy * 8 + 1, 1, C.coal)
+        for t in (-6, 0, 6):
+            s.px(round(c + ux * t), round(c + uy * t - 1), C.stone)
+        out.append(check(s, f"thrown_beam_{f}"))
+    return out, W
+
+
+def record_frames():
+    """The DJ's records: a coal disc, its grooves, a hot label whose shine goes round."""
+    out = []
+    W = 14
+    for f in range(4):
+        s = sprite(W, W)
+        c = W // 2
+        s.circle(c, c, 5, C.coal, fill=True).circle(c, c, 5, C.ink)
+        s.circle(c, c, 3, C.iron)
+        s.circle(c, c, 1, C.hot, fill=True)
+        s.px(c, c, C.ink)
+        gx, gy = [(-3, -3), (3, -3), (3, 3), (-3, 3)][f]
+        s.px(c + gx, c + gy, C.slate).px(c + gx // 3 * 2, c + gy, C.slate)
+        out.append(check(s, f"thrown_record_{f}"))
     return out, W
 
 
@@ -189,6 +265,10 @@ def main():
     desk, W = desk_frames()
     strip(desk, W, W).save(EXPORT / "thrown_desk.png")
     manifest.append({"name": "thrown_desk", "file": "thrown_desk.png", "frame": [W, W], "frames": 4, "pivot": [W // 2, W // 2 + 2]})
+    for name, make in (("thrown_beam", beam_frames), ("thrown_record", record_frames)):
+        fr, W = make()
+        strip(fr, W, W).save(EXPORT / f"{name}.png")
+        manifest.append({"name": name, "file": f"{name}.png", "frame": [W, W], "frames": 4, "pivot": [W // 2, W // 2]})
     c = coin()
     strip(c, 7, 7).save(EXPORT / "coin.png")
     manifest.append({"name": "coin", "file": "coin.png", "frame": [7, 7], "frames": 4, "pivot": [3, 3]})

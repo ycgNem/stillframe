@@ -8,9 +8,12 @@ export const TILE_GLASS = 2;
 export const TILE_PROP = 3;
 export const TILE_DOOR = 4;
 export const TILE_VOID = 5;
+/** open air at a roof's edge: nobody walks into it, but a red can be pushed over */
+export const TILE_DROP = 6;
 
-/** Who is asking: reds may walk through doors (they come in that way); nobody else can. */
-export type Mover = 'player' | 'red';
+/** Who is asking: reds may walk through doors (they come in that way); nobody else can. A body being
+ *  shoved or charging (`flung`) is stopped by walls but not by the drop: that's how reds go over. */
+export type Mover = 'player' | 'red' | 'flung';
 
 export function tileAt(w: World, cx: number, cy: number): number {
   if (cx < 0 || cy < 0 || cx >= w.cols || cy >= w.rows) return TILE_VOID;
@@ -30,17 +33,29 @@ export function cellIndex(w: World, x: number, y: number): number {
 export function solidFor(t: number, who: Mover): boolean {
   if (t === TILE_FLOOR) return false;
   if (t === TILE_DOOR) return who !== 'red';
+  if (t === TILE_DROP) return who !== 'flung';
   return true;
 }
 
-/** Bullets and thrown things stop here (glass is handled by the caller: it breaks). */
+/** Bullets and thrown things stop here (glass is handled by the caller: it breaks). They fly over the drop. */
 export function stopsShots(t: number): boolean {
   return t === TILE_WALL || t === TILE_PROP || t === TILE_DOOR || t === TILE_VOID;
 }
 
-/** You can see through floor and glass. */
+/** You can see through floor, glass and open air. */
 export function blocksSight(t: number): boolean {
-  return t !== TILE_FLOOR && t !== TILE_GLASS;
+  return t !== TILE_FLOOR && t !== TILE_GLASS && t !== TILE_DROP;
+}
+
+/** Is a train passing over this cell right now? Trains block sight and shots while they're there. */
+export function trainOver(w: World, cx: number, cy: number): boolean {
+  const x0 = cx * TILE, y0 = cy * TILE;
+  return w.trains.some((t) => t.x < x0 + TILE && t.x + t.w > x0 && t.y < y0 + TILE && t.y + t.h > y0);
+}
+
+/** Is this point inside a train? */
+export function inTrain(w: World, x: number, y: number, r = 0): boolean {
+  return w.trains.some((t) => x + r > t.x && x - r < t.x + t.w && y + r > t.y && y - r < t.y + t.h);
 }
 
 /** Does a box of half-size r at (x, y) overlap anything solid for `who`? */
@@ -104,12 +119,12 @@ export function walkCells(ax: number, ay: number, bx: number, by: number, visit:
 
 /** Clear line of sight between two points (glass doesn't block it). */
 export function canSee(w: World, ax: number, ay: number, bx: number, by: number): boolean {
-  return !walkCells(ax, ay, bx, by, (cx, cy) => blocksSight(tileAt(w, cx, cy)));
+  return !walkCells(ax, ay, bx, by, (cx, cy) => blocksSight(tileAt(w, cx, cy)) || (w.trains.length > 0 && trainOver(w, cx, cy)));
 }
 
 /** Would a bullet get from a to b? Glass counts as clear (it breaks); walls and props don't. */
 export function shotClear(w: World, ax: number, ay: number, bx: number, by: number): boolean {
-  return !walkCells(ax, ay, bx, by, (cx, cy) => stopsShots(tileAt(w, cx, cy)));
+  return !walkCells(ax, ay, bx, by, (cx, cy) => stopsShots(tileAt(w, cx, cy)) || (w.trains.length > 0 && trainOver(w, cx, cy)));
 }
 
 /** Can a box of half-size r walk straight from a to b? (Samples the path every few px.) */
@@ -126,8 +141,16 @@ export function pathClear(w: World, ax: number, ay: number, bx: number, by: numb
 /** Distance from a point along a direction until a shot would stop (for aim-tell lines). */
 export function rayLength(w: World, x: number, y: number, ang: number, max: number): number {
   const dx = Math.cos(ang), dy = Math.sin(ang);
-  for (let d = 0; d < max; d += 2) if (stopsShots(tileOfPoint(w, x + dx * d, y + dy * d))) return d;
+  for (let d = 0; d < max; d += 2) {
+    const px = x + dx * d, py = y + dy * d;
+    if (stopsShots(tileOfPoint(w, px, py)) || (w.trains.length > 0 && inTrain(w, px, py))) return d;
+  }
   return max;
+}
+
+/** Is the cell (tile coords) on a track row a train is due on or passing along? */
+export function hotCell(w: World, cx: number, cy: number): boolean {
+  return w.hotRows.length > 0 && w.hotRows.includes(cy) && w.look[cy * w.cols + cx] === '_';
 }
 
 export function cellCenter(i: number, cols: number) {

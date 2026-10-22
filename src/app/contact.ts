@@ -1,7 +1,7 @@
 // A debug screen: every sprite in the atlas, every frame, on the floor colour (docs/PLAN.md M6 "contact
 // sheet"). Open it with __app.open('contact'); scroll with the mouse wheel.
 import { PAL } from '../data/palette';
-import { drawText } from '../render/font';
+import { text } from '../ui/text';
 import { rect } from '../render/prims';
 import { VIEW } from '../render/view';
 import type { App, Screen } from './app';
@@ -14,7 +14,8 @@ export class ContactScreen implements Screen {
   constructor(private app: App) {}
 
   frame() {
-    const ctx = this.app.display.ctx, atlas = this.app.atlas, inp = this.app.input;
+    const ctx = this.app.world, atlas = this.app.atlas, inp = this.app.input;
+    this.app.ui.begin();
     if (inp.pressed('WheelDown')) this.scroll += 40;
     if (inp.pressed('WheelUp')) this.scroll = Math.max(0, this.scroll - 40);
     if (inp.pressed('Escape')) this.app.open('title');
@@ -28,7 +29,7 @@ export class ContactScreen implements Screen {
         y += row + 8;
         row = 0;
       }
-      drawText(ctx, name.replace(/_/g, ' '), x, y, PAL.stone);
+      text(this.app.ui.ctx, name.replace(/_/g, ' '), x * 2, y * 2 - 2, PAL.iron, { scale: 1 });
       sp.frames.forEach((_, i) => atlas.draw(ctx, name, i, x + i * (w + 1) + sp.pivot[0], y + 6 + sp.pivot[1]));
       x += need + 4;
       row = Math.max(row, h + 6);

@@ -187,30 +187,52 @@ Follows [STYLE.md](STYLE.md) and [ART_BUDGET.md](ART_BUDGET.md).
 - [ ] Done when: a fresh player finishes Chapter 1 in 20–40 min (playtest note), all tests and e2e
       pass, the live link works.
 
-### M8 — Abilities and balance
-- [ ] Rewind snapshots (ring buffer, 0.25 s), Frameskip III, Shield II, Reach III catch.
-- [ ] Economy pass with `scripts/economy.ts` against the 70% target (GAME_DESIGN §10).
+### M8 — Abilities and balance ✅
+- [x] Rewind snapshots (ring buffer, 0.25 s), Frameskip III, Shield II, Reach III catch.
+      *(`tests/abilities.test.ts` "keeps a snapshot every 0.25 game s for the last 3 s", "jumps back
+      about 2 s…", "Shield II: its break stuns…"; `tests/combat.test.ts` "Frameskip … tier III shatters
+      reds on the way", "Reach III catches a red's throw out of the air".)*
+- [x] Economy pass with `scripts/economy.ts` against the 70% target (GAME_DESIGN §10). *(All 40
+      levels, first pass: 2,476 coins, 94/120 stars = 70% of the 3,560-coin Workshop; see the log.)*
 
-### M9 — Chapters 2–3
-- [ ] Rush Hour (shotgun, Runner, Brute, trains, The Conductor).
-- [ ] Under Construction (SMG, Sniper, ledges, The Foreman).
-- [ ] PixelLab: Brute, Runner, Sniper, 2 tilesets (ART_BUDGET).
+### M9 — Chapters 2–3 ✅
+- [x] Rush Hour (shotgun, Runner, Brute, trains, The Conductor). *(`src/data/levels/ch2.ts`; every
+      level cleared by the bot with a matching replay in `tests/levels.test.ts`; trains, Runner and
+      Conductor in `tests/chapters.test.ts`; a train and the landing target seen in the browser.)*
+- [x] Under Construction (SMG, Sniper, ledges, The Foreman). *(`ch3.ts`; bot clears; SMG, Sniper,
+      ledges, hook and Foreman tests in `tests/chapters.test.ts`; the roof and hook seen in the browser.)*
+- [x] PixelLab: Brute, Runner, Sniper, 2 tilesets (ART_BUDGET). *(Not used: every new red, item and
+      tile was drawn by hand in build scripts and code. Ledger row in ART_BUDGET.md; still 0 / 100.)*
 
-### M10 — Chapters 4–5 and the ending
-- [ ] Strobe (katana, Mirror, strobe lighting, The DJ).
-- [ ] The Core (Splitter, rule glitches, The Frame), ending and credits.
+### M10 — Chapters 4–5 and the ending ✅
+- [x] Strobe (katana, Mirror, strobe lighting, The DJ). *(`ch4.ts`; bot clears; katana, Mirror, beat
+      and DJ tests; the dance floor and the strobe's dark seen in the browser.)*
+- [x] The Core (Splitter, rule glitches, The Frame), ending and credits. *(`ch5.ts`; bot clears;
+      Splitter, wells, echo, inverse, mirror and eye tests; the Chapter 5 end card leads to
+      `src/app/credits.ts`.)*
 
-### M11 — Polish
-- [ ] Juice: hit stop, whole-pixel screen shake, shard sparkle, coin fly-to-counter.
-- [ ] Settings: keybinds, volume, shake, flash reduction, outline-enemies mode.
-- [ ] Title attract mode (scripted replay).
+### M11 — Polish ✅
+- [x] Juice: hit stop, whole-pixel screen shake, shard sparkle, coin fly-to-counter. *(Hit stop and
+      shake in `play.ts` (also on landings, drops and trains); coins fly to the counter (`fx.ts`); resting
+      shards sparkle a few at a time (`Fx.drawFloor`).)*
+- [x] Settings: keybinds, volume, shake, flash reduction, outline-enemies mode. *(`src/app/settings.ts`;
+      `e2e/out/ui-1280/` settings shot; flash reduction also stills the hazard blinks and the strobe.)*
+- [x] Title attract mode (scripted replay). *(The bot plays levels you've cleared behind the title;
+      seen in the browser.)*
 
 ### M12 — 1.0
-- [ ] Gauntlet mode.
-- [ ] Perf budget: 60 fps with 40 reds and 300 shards on a laptop (`e2e/perf.mjs`).
+- [x] Gauntlet mode. *(`src/app/gauntlet.ts`, `src/meta/gauntlet.ts`; `tests/gauntlet.test.ts`: waves
+      built from their number, arenas and glitches in turn, the bot clears every arena under its glitch;
+      the arena card, wave banner and results card seen in the browser.)*
+- [x] Perf budget: 60 fps with 40 reds and 300 shards on a laptop (`e2e/perf.mjs`). *(This machine,
+      headless Chrome: 41 reds and ~3,500 airborne shards; the app's work per frame 3.0 ms mean, 4.2 ms
+      at the 95th percentile, 18 ms worst, against 16.7 ms for 60 fps.)*
 - [ ] Critic passes (fresh-eyes playtest reports in `critique/`), fixes. *(Pass 1 done 2026-10-22: its
-      critical and major issues fixed, see the decisions log; more passes before 1.0.)*
-- [ ] Patch notes, README, live.
+      critical and major issues fixed, see the decisions log. Pass 2 (`critique/2026-10-22-chapters.md`)
+      was Claude's own review of chapters 2–5, not fresh eyes: still wanted, an independent pass or a
+      human on the new chapters.)*
+- [ ] Patch notes, README, live. *(`docs/PATCH_NOTES.md` and the README are written; not live until
+      this is pushed to `main`.)*
 
 ### Stretch
 Daily seeded Gauntlet · replay GIF export · best-replay gallery · level editor · controller support ·
@@ -266,3 +288,13 @@ Electron/desktop build.
 | 2026-10-22 | Par ≈ 1.6× the bot's clean game time | pars set with generous slack made a third of all stars free |
 | 2026-10-22 | Friendly fire on the Manager does 1 damage; disarmed weapons drop 18 px toward you and the red can't grab for 0.8 s | the boss died to its own gunner, and disarmed reds re-armed in the same tick |
 | 2026-10-22 | Hit-stop (0.05 s per shatter, 1 s for the Manager) and the post-clear beat are app-level: the screen returns time scale 0 | the sim stays unaware of presentation, and replays stay exact |
+| 2026-10-22 | Text and UI moved to their own 640×360 layer, with two new bitmap faces (Pane 8 px caps with lowercase and 2 px verticals; Shard 11 px display caps), sentence case, ink on paper cards, keycaps and icons in rich text (STYLE.md §8) | the user asked for clearer text, "the opposite of Last Watt" (thin pale caps on dark slate), like Fins & Fronds and Foldworks; at 320×180 there was no room for letters with real shapes |
+| 2026-10-22 | Hazards live in the sim and follow from the tick alone (trains, hooks), or from seeded state (the beat's patterns); no new state for replays or Rewind to carry | determinism; a train's position is a pure function of game time |
+| 2026-10-22 | Heavy reds (Brutes, bosses, the Frame's eyes) take one punch's stun, then shrug punches off for 2.5 s; punches and your body never move them | the bot stun-locked the Foreman and walked it off the roof; the same trick worked on every Brute and the Manager. 1-8's par rose 24 → 53 with the bot's slower fight |
+| 2026-10-22 | The Foreman: bullets and punches chip (armour 1), a fall costs 6 and it climbs back through a door; the hook does 1 and a short daze | the edge is the plan; the hook stood over its start and did most of the work |
+| 2026-10-22 | Glitches: *inverse* is in the time rule (`createTime(…, inverse)`), *mirror* and *echo* in the sim; strobe is render-only and off under "Fewer flashes" | each lives where its rule lives; the strobe is a look, not a rule |
+| 2026-10-22 | Pars for chapters 2–5 set at 1.6× the bot's time by `scripts/dev/botcheck.ts` | the rule set in critic pass 1 |
+| 2026-10-22 | Loadout adds the SMG (220, after 3-1) and katana (260, after 4-1); the Workshop totals 3,560 | weapons you meet become weapons you can start with |
+| 2026-10-22 | Economy over all 40 levels: first pass 2,476 coins with 94/120 stars = 70% of the Workshop; a second pass 92%. Prices unchanged | on the target (GAME_DESIGN §10); chapter pay is flat rather than +25% a chapter, accepted since the total is right |
+| 2026-10-22 | Gauntlet rounds are ordinary LevelDefs built from the wave number (`src/meta/gauntlet.ts`); the play screen takes an optional run that handles the clear and the death | the sim, the bot and the tests needed nothing new; runs are the same every time |
+| 2026-10-22 | PixelLab not used for chapters 2–5 either: every red, item, prop and tile hand-made | the hand-made look held up; 0 / 100 generations spent |

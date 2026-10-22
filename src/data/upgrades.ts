@@ -16,14 +16,14 @@ export interface TrackDef {
 export const TIER_PRICES = [40, 100, 200] as const;
 
 export const TRACKS: TrackDef[] = [
-  { id: 'stride', name: 'STRIDE', blurb: 'YOU OUTPACE TIME', tiers: ['YOU MOVE 15% FASTER THAN IT', 'YOU MOVE 30% FASTER THAN IT', 'YOU MOVE 45% FASTER THAN IT'] },
-  { id: 'trigger', name: 'TRIGGER', blurb: 'SHORTER ACTION BURSTS', tiers: ['BURST 0.10 S', 'BURST 0.04 S', 'BURST 0.02 S'] },
-  { id: 'shield', name: 'SHIELD', blurb: 'SURVIVE A HIT', tiers: ['1 FREE HIT PER LEVEL', 'ITS BREAK STUNS REDS NEARBY', '2 FREE HITS'] },
-  { id: 'frameskip', name: 'FRAMESKIP', blurb: 'SPACE: DASH IN ZERO TIME', tiers: ['3 TILES, 4 S COOLDOWN', '4 TILES, 2.5 S COOLDOWN', 'DASHING THROUGH REDS SHATTERS THEM'] },
-  { id: 'rewind', name: 'REWIND', blurb: 'DIE, JUMP BACK 2 SECONDS', tiers: ['1 CHARGE PER LEVEL', '2 CHARGES', 'CHARGES REFILL EACH WAVE'] },
-  { id: 'arm', name: 'ARM', blurb: 'BETTER THROWS', tiers: ['THROWS FLY 25% FASTER', 'THROWS SHATTER GRUNTS', 'THROWS RICOCHET ONCE'] },
-  { id: 'mag', name: 'MAG', blurb: 'AMMO ON PICKUP', tiers: ['+1 ROUND', '+2 ROUNDS', '+3 ROUNDS'] },
-  { id: 'reach', name: 'REACH', blurb: 'GRAB FROM FURTHER', tiers: ['1.5 TILES', '2 TILES', 'CATCH THROWN ITEMS'] },
+  { id: 'stride', name: 'Stride', blurb: 'You outpace time', tiers: ['You move 15% faster than it', 'You move 30% faster than it', 'You move 45% faster than it'] },
+  { id: 'trigger', name: 'Trigger', blurb: 'Shorter action bursts', tiers: ['A burst lasts 0.10 s', 'A burst lasts 0.04 s', 'A burst lasts 0.02 s'] },
+  { id: 'shield', name: 'Shield', blurb: 'Survive a hit', tiers: ['One free hit per level', 'Its break stuns reds nearby', 'Two free hits per level'] },
+  { id: 'frameskip', name: 'Frameskip', blurb: '[Space] dashes in zero time', tiers: ['3 tiles, 4 s cooldown', '4 tiles, 2.5 s cooldown', 'Dashing through a red shatters it'] },
+  { id: 'rewind', name: 'Rewind', blurb: 'Die, jump back 2 seconds', tiers: ['One charge per level', 'Two charges per level', 'Charges refill each wave'] },
+  { id: 'arm', name: 'Arm', blurb: 'Better throws', tiers: ['Throws fly 25% faster', 'Throws shatter Grunts and Gunners', 'Throws ricochet once'] },
+  { id: 'mag', name: 'Mag', blurb: 'Ammo on pickup', tiers: ['+1 round in every gun', '+2 rounds in every gun', '+3 rounds in every gun'] },
+  { id: 'reach', name: 'Reach', blurb: 'Grab from further', tiers: ['Pick up from 1.5 tiles', 'Pick up from 2 tiles', 'Catch thrown things mid-air'] },
 ];
 
 /** Per-tier values the sim and the time rule read. Index 0 = not bought. */
@@ -40,10 +40,12 @@ export const TIER_VALUES = {
 };
 
 /** Carry two items; Q or the mouse wheel swaps. */
-export const HOLSTER = { name: 'HOLSTER', blurb: 'CARRY TWO ITEMS (Q SWAPS)', price: 120 };
+export const HOLSTER = { name: 'Holster', blurb: 'Carry two things. [Q] or the wheel swaps.', price: 120 };
 
 /** Start each level holding one of these, once bought. `after` is the level where it first appears. */
 export const LOADOUT: { item: ItemKind; price: number; after: string }[] = [
   { item: 'pistol', price: 80, after: '1-1' },
   { item: 'shotgun', price: 160, after: '1-8' },
+  { item: 'smg', price: 220, after: '3-1' },
+  { item: 'katana', price: 260, after: '4-1' },
 ];

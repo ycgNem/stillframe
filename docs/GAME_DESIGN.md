@@ -123,14 +123,18 @@ Weapons are black. Guns have **no reload**: when empty, throw them.
 | Fists | punch, 15 px from your edge to theirs, in a 115° cone | — | 0.35 | 1 damage; the first punch disarms; hits the red nearest your aim |
 | Pistol | 1 bullet, 220 px/s | 6 | 0.30 | the workhorse |
 | Shotgun | 5 pellets, 20° spread | 2 | 0.80 | pellets die after 5 tiles |
-| SMG | 3-round burst | 12 (4 bursts) | 0.12 per shot | ch2+ |
-| Katana | 90° slash, 1.5 tile reach | — | 0.40 | **cuts bullets**; ch4+ |
+| SMG | 3-round burst, 240 px/s, 0.07 s between rounds | 12 (4 bursts) | 0.45 per burst | one click, three rounds; ch3+ |
+| Rifle | 1 round, 520 px/s, **goes through** the reds it shatters | 3 | 0.90 | Snipers carry it; ch3+ |
+| Katana | a ~97° slash, 18 px reach | — | 0.40 | 3 damage to everything in the arc; **cuts bullets out of the air** (a parry); ch4+ |
 | Throwables | bottle, mug, ashtray, keyboard, any empty gun | 1 | 0.25 | stun 1.6 s and disarm; break on impact (guns land instead) |
 
 - **Damage:** reds have **3 integrity**. Bullets and katana deal 3 (one-shot), punches deal 1.
   Throws deal 0 but stun and disarm (Arm II makes any thrown item shatter Grunts and Gunners).
 - **Punches** stun for 0.35 s and knock the red back 4 px (little enough that the next punch still
-  reaches); the first punch on an armed red knocks its weapon loose. Of the reds in reach, a punch goes
+  reaches); the first punch on an armed red knocks its weapon loose. **Heavy reds** (Brutes, bosses,
+  the Frame's eyes) are rocked by the first punch only, then shrug punches off for 2.5 s like they do
+  throws, and are never knocked back or shouldered aside: you give way, not them. Fists can't
+  stun-lock a heavy red or walk it off a roof. Of the reds in reach, a punch goes
   to the one nearest where you aim. A punch landed on a throw-stunned red keeps it stunned, so
   throw-then-fists is a stun kill.
 - **Disarms:** a punched or hit red drops its weapon 18 px toward you and can't pick anything up for
@@ -155,10 +159,10 @@ All reds are red glass. They shatter into pixel fragments and drop coins (§10).
 | **Grunt** | 3 | 30 | walks at you, punches with a 0.5 s windup; uses any weapon it holds | 1 |
 | **Gunner** | 3 | 26 | pistol; keeps 5–8 tiles away, strafes even while aiming, fires after a 0.55 s aim tell | 1 |
 | **Brute** | 9 | 20 | shrugs off throws (stun only); charges in a straight line after a 0.8 s tell | 1 (boss), 2 |
-| **Runner** | 3 | 60 | zigzags in, fists only | 2 |
-| **Sniper** | 3 | 0 | draws a red laser line for 1.5 s, then fires a fast bullet (400 px/s) | 3 |
-| **Mirror** | 3 | 28 | reflects bullets; must be punched, cut or hit with a throw | 4 |
-| **Splitter** | 3 | 30 | shatters into two small fast reds once | 5 |
+| **Runner** | 3 | 58 | weaves side to side as it closes in (from its first step), fists only, never picks anything up | 2 |
+| **Sniper** | 3 | 0 | never moves; holds its red line on you for 1.5 s (locking for the last 0.3), then fires a rifle round (322 px/s: reds' rounds fly at 62% of yours), 2.2 s between shots | 3 |
+| **Mirror** | 3 | 28 | turns your bullets straight back at you; punches, cuts and throws work | 4 |
+| **Splitter** | 3 | 28 | breaks into two **Shards** (1 integrity, 50 px/s, tiny) the first time it shatters | 5 |
 
 Reds pick up weapons they walk over, and an unarmed red goes for a loaded gun it can see if it is
 closer than you. They see along clear lines (walls and props block sight, glass doesn't) and path
@@ -183,15 +187,16 @@ As built (numbers in `src/data/reds.ts`):
   side's stray bullets and desks only chip it (1 damage), so the last blow is yours. When it breaks the
   room stops for a second and its name comes up.
 
-**Bosses** (one per chapter, level X-8):
+**Bosses** (one per chapter, level X-8; all 18 integrity unless noted, all heavy, phases at 12 and 6
+with 1.5 s of guard and help through the doors; numbers in `src/data/reds.ts`):
 
-| Chapter | Boss | Gimmick |
+| Chapter | Boss | As built |
 |---|---|---|
-| 1 | **The Manager** | a Brute in a glass office; throws desks, calls Grunts through the doors each phase |
-| 2 | **The Conductor** | rides train cars through the platform; leaps off to strike when the train stops |
-| 3 | **The Foreman** | swings a crane hook across the roof; you push reds off the ledges |
-| 4 | **The DJ** | attacks on the beat (in game time): stand still and the beat stops too |
-| 5 | **The Frame** | a giant red face in the white void; its weak points only open while time runs |
+| 1 | **The Manager** | a Brute in a glass office; throws desks, calls Grunts through the doors each phase, charges from phase 2 |
+| 2 | **The Conductor** | charges like a Brute on the platform. When a train stops at its platform it crouches (0.5 s), boards and rides out of reach; at the next stop it leaps off onto where you stand, a red target warning 0.9 s ahead; the landing kills anything within 18 px. Fights 6 / 5 / 4 s per phase before boarding again |
+| 3 | **The Foreman** | charges and throws steel beams (0.7 s tell). Bullets and punches only **chip** it (1 damage). A charge over the roof's edge costs it **6** integrity and it climbs back up through a door 2.2 s later; when 6 or less is left, the fall finishes it. The crane hook rocks it (1 damage, a short daze) |
+| 4 | **The DJ** (15) | never leaves its desk; throws records (0.6 s tell) and plays the beat on the dance floor, faster each phase (bar ×1, ×0.85, ×0.7) |
+| 5 | **The Frame** | its **eyes** (6 integrity each, floating): shut while you stand still (bullets glance off), open while you move. Each fires a rifle round after a 0.9 s line and, in turn, a ring of 10 slow bullets after a 0.8 s tell. The Frame breaks with the last eye |
 
 ---
 
@@ -206,12 +211,13 @@ As built (numbers in `src/data/reds.ts`):
 - **Stars (3 per level):**
   1. ★ **Clear** the level.
   2. ★ **Par:** clear under the level's par **game** time. Pars are about 1.6× the bot's clean
-     time (1-1 13 s · 1-2 8 · 1-3 16 · 1-4 15 · 1-5 28 · 1-6 9 · 1-8 24): a clean run earns it, a
-     sloppy one doesn't.
+     time (1-1 13 s · 1-2 8 · 1-3 16 · 1-4 15 · 1-5 28 · 1-6 9 · 1-8 53; chapters 2–5 in their files,
+     set by `scripts/dev/botcheck.ts`): a clean run earns it, a sloppy one doesn't.
   3. ★ **Challenge:** one rule per level, shown on the intro card, checked by the sim
      (`src/sim/challenges.ts`): Fists only · N kills on stunned reds · No shots fired · No missed
      shots · A combo of N · Escape without a kill · Punch kills · N kills · Finish the boss with a
-     punch · Untouched (no shield or rewind used) · Kill the Gunner first.
+     punch · Untouched (no shield or rewind used) · Kill the Gunner first · Let a hazard take N
+     reds · Send N reds over the edge · N katana kills · No punches · Send the boss over the edge.
 - On a **Survive** level, surviving earns the par star too (there is no faster way to survive).
 
 ---
@@ -223,12 +229,34 @@ Five chapters of 8 levels (7 + a boss). Each chapter adds one weapon, one or two
 | # | Chapter | Setting | New this chapter | Levels |
 |---|---|---|---|---|
 | 1 | **Nine to Five** | office floors | fists, pistol, throwables; Grunt, Gunner | 1-1 Elevator (move/time tutorial) · 1-2 Cubicles (punch, pick up) · 1-3 Break Room (throws) · 1-4 Copy Room (pistol) · 1-5 Conference (waves from doors) · 1-6 Stairwell (escape) · 1-7 Server Closet (survive) · 1-8 **The Manager** |
-| 2 | **Rush Hour** | subway | shotgun; Runner, Brute; **trains** (move in game time, kill anything) | 2-1 Turnstiles · 2-2 Platform · 2-3 Last Car · 2-4 Tunnel (escape) · 2-5 Crowd · 2-6 Maintenance · 2-7 Express (survive) · 2-8 **The Conductor** |
-| 3 | **Under Construction** | rooftops and scaffolds | SMG; Sniper; **ledges** (push reds off, don't fall) | 3-1 Lift · 3-2 Girders · 3-3 Laser Lines · 3-4 Scaffold (escape) · 3-5 Water Tower · 3-6 Crane · 3-7 Wind (survive) · 3-8 **The Foreman** |
-| 4 | **Strobe** | a white nightclub | katana; Mirror; **strobe** (the room is dark between flashes; reds still glow) | 4-1 Coat Check · 4-2 Dance Floor · 4-3 Mirror Hall · 4-4 Back Exit (escape) · 4-5 VIP · 4-6 Bar Fight · 4-7 Last Song (survive) · 4-8 **The DJ** |
-| 5 | **The Core** | the white void | Splitter; **rule glitches** (time runs when still and stops when moving; gravity wells; mirrored controls) | 5-1 Static · 5-2 Inverse · 5-3 Echo · 5-4 Seam (escape) · 5-5 Split · 5-6 Mirror Mind · 5-7 Hold (survive) · 5-8 **The Frame** |
+| 2 | **Rush Hour** | subway | Runners, Brutes as regulars; **trains** (move in game time, kill anything) | 2-1 Turnstiles · 2-2 Platform · 2-3 Last Car · 2-4 Tunnel (escape) · 2-5 Crowd · 2-6 Maintenance · 2-7 Express (survive) · 2-8 **The Conductor** |
+| 3 | **Under Construction** | rooftops and scaffolds | SMG; Sniper; **ledges** (push reds off, don't fall); **crane hooks** | 3-1 Lift · 3-2 Girders · 3-3 Laser Lines · 3-4 Scaffold (escape) · 3-5 Water Tower · 3-6 Crane · 3-7 Wind (survive) · 3-8 **The Foreman** |
+| 4 | **Strobe** | a white nightclub | katana; Mirror; **the beat** (the dance floor lights up and drops); **strobe** (the room is dark between flashes; reds still glow) | 4-1 Coat Check · 4-2 Dance Floor · 4-3 Mirror Hall · 4-4 Back Exit (escape) · 4-5 VIP · 4-6 Bar Fight · 4-7 Last Song (survive) · 4-8 **The DJ** |
+| 5 | **The Core** | the white void | Splitter; **rule glitches** (time runs when still and crawls when moving; every shot echoes; mirrored controls) and **gravity wells** | 5-1 Static · 5-2 Inverse · 5-3 Echo · 5-4 Seam (escape) · 5-5 Split · 5-6 Mirror Mind · 5-7 Hold (survive) · 5-8 **The Frame** |
 
-Chapter N+1 unlocks when N's boss falls. Levels unlock in order inside a chapter. **MVP is Chapter 1.**
+Chapter N+1 unlocks when N's boss falls. Levels unlock in order inside a chapter. All five chapters
+are built (`src/data/levels/ch1.ts` … `ch5.ts`); the bot clears every level in the tests. A level's
+intro card names what's new in it (`src/meta/novelty.ts`).
+
+### Hazards (all in game time: standing still freezes them too)
+
+- **Trains** (`_` track, two rows): every `period` game s the rails light red for **1.6 s**, then a train
+  of 44 px cars runs the whole width. It kills you, shatters reds (your kill, +2 style) and stops
+  bullets. Reds won't step onto lit rails (their paths go round). A line can **stop** at a platform
+  for a few seconds: that's where the Conductor boards.
+- **Ledges** (`~`, the drop): you can't walk off. A punch, a throw's shove or a charge at the edge
+  sends a red over (your kill, +2 style). A Brute charging past you can run itself off.
+- **Crane hooks:** a hook swings on its cable across the roof; its shadow is ringed red. It kills you
+  and shatters reds it meets.
+- **The beat** (`:` dance floor): every bar (2.2–2.4 game s) part of the floor lights red (stripes,
+  columns, a checker, half the floor, or a ring round you), and 1 s later the drop shatters whoever
+  stands on a lit tile, you included.
+- **Strobe** (render only): between flashes the room goes dark and only lit tiles, reds, bullets, you
+  and items show. "Fewer flashes" in Settings turns it off.
+- **Gravity wells:** bend bullets and throws toward them and drag at anyone near (you can walk out).
+- **Glitches:** *inverse* (the time rule turns over: standing still runs time at walking speed, moving
+  crawls), *echo* (every shot, yours and theirs, fires again from the same spot 0.6 s later; it costs
+  no ammo), *mirror* (left and right swap; aim doesn't).
 
 ---
 
@@ -251,11 +279,11 @@ counter; they are **banked only when the level is cleared** (die and that attemp
 
 - **Repeat clears** pay 50% of every line (kills, combos, style, clear, untouched; rounded down) and
   nothing for stars already earned.
-- **Measured** (`node scripts/run.mjs scripts/economy.ts`, the bot playing Chapter 1 in order): the
-  first pass pays 479 coins with 19/24 stars (first clears of 43–96 each: more than the 25–45
-  target, mostly from the three new stars; the bot beats every par, a human will miss some); a second pass adds about 130. That buys every tier I,
-  the Pistol and the Holster, about 20% of the whole Workshop. Chapters 2–5 are meant to pay for the
-  rest.
+- **Measured** (`node scripts/run.mjs scripts/economy.ts`, the bot playing all 40 levels in order and
+  buying the cheapest next thing it can afford): the first pass pays **2,476 coins with 94/120 stars**
+  (first clears of 36–143; chapters pay 425–463 each, chapter 5 672), which is **70% of the 3,560-coin
+  Workshop**, right on target; a second pass brings it to 92%. Chapter 1 alone pays 463, a little more
+  than tier I of everything.
 - **Targets:** a first clear of a chapter-1 level pays about 25–45 coins; the whole of chapter 1 with
   every star about 400. Later chapters pay roughly +25% per chapter.
 - The economy is tuned so a player who clears everything with about two thirds of the stars can afford
@@ -280,7 +308,8 @@ maxed = 2,720 coins).
 | **Reach** — pickup range | 1.5 tiles | 2 tiles | catch thrown items mid-air |
 
 **Loadout** (one-time unlocks, after the weapon first appears in a level): start each level holding a
-Pistol (80) · Shotgun (160) · Katana (240). **Holster** (carry two items, 120).
+Pistol (80, after 1-1) · Shotgun (160, after 1-8) · SMG (220, after 3-1) · Katana (260, after 4-1).
+**Holster** (carry two items, 120). The whole Workshop costs 3,560.
 
 Challenge stars still apply with upgrades on (Fists only means fists only).
 
@@ -311,9 +340,14 @@ Challenge stars still apply with upgrades on (Fists only means fists only).
 ## 14. Modes
 
 - **Story:** chapters 1–5 (§9).
-- **Gauntlet** (unlocks after chapter 2): endless waves in rotating arenas. Every 5 waves a random
-  **glitch** applies (double-speed reds, pistols only, inverted time, no standing still…). Pays coins
-  per wave; local best wave on the title screen.
+- **Gauntlet** (unlocks after chapter 2): endless waves, **five to an arena**, the arenas in turn
+  (Office, Subway with its trains, Roof with its edges, Club with the beat and strobe, Core). From the
+  second arena on each has a **glitch**, in turn: inverse time, echoing shots, gravity wells, mirrored
+  controls. Waves grow from 2 Grunts to 10 of anything (Runners from wave 2, armed Grunts 3, Gunners
+  4, Splitters 6, Mirrors 8, one Brute from 10); every wave is built from its number alone, so a run
+  is the same every time (`src/meta/gauntlet.ts`, data in `src/data/gauntlet.ts`). Clearing wave n pays
+  2 + n coins, and kills pay as usual; coins bank as you go, even when you fall. A card between arenas
+  says what's next; when you fall, one says how far you got. The best wave shows on the title.
 - **Daily** (stretch): one seeded Gauntlet run per day.
 
 ---
@@ -327,7 +361,8 @@ Title ──► Chapter map ──► Level intro card ──► Play ──► 
                └─────────────────────────────── Next / Map / Workshop ◄─────────────────────────────┘
 ```
 
-- **Title:** live attract mode (a scripted replay), Play, Gauntlet, Settings. On a fresh save, Play
+- **Title:** live attract mode (the bot plays levels you've already cleared, so nothing ahead is
+  spoiled), Play, Gauntlet (with your best wave), Workshop, Settings. On a fresh save, Play
   goes straight into 1-1 without the intro card; after that it opens the chapter map.
 - **Death:** the room freezes and the red that got you is ringed, with a dotted line to where you
   stood; after 0.6 s a strip at the top says "SHATTERED BY A GUNNER" and how to try again.

@@ -4,15 +4,15 @@ import { nextLevel } from '../data/levels';
 import { PAL } from '../data/palette';
 import { TICK_RATE } from '../data/tuning';
 import type { Tally } from '../meta/tally';
-import { centerBig, centerText, drawText, textWidth } from '../render/font';
 import { rect } from '../render/prims';
-import { VIEW } from '../render/view';
-import { coinIcon, star } from '../ui/kit';
+import { bigStar, icon, plate, UI } from '../ui/kit';
+import { measure, text } from '../ui/text';
 import type { App, Screen } from './app';
+import { EndScreen } from './end';
+import { keyLabel } from './keys';
 import { MapScreen } from './map';
 import { PlayScreen } from './play';
 import { WorkshopScreen } from './workshop';
-import { EndScreen } from './end';
 
 const LINE_TIME = 0.32;
 
@@ -32,19 +32,46 @@ export class TallyScreen implements Screen {
   }
 
   frame(realDt: number) {
-    const ctx = this.app.display.ctx, ui = this.app.ui, r = this.result, def = this.play.def;
+    const ui = this.app.ui, ctx = ui.ctx, r = this.result, def = this.play.def;
     this.t += realDt;
     this.app.sound.update(realDt, 0.3);
     // skip the count-up with a click or Space; once it has played out, clicks belong to the buttons
     const counting = this.t < r.lines.length * LINE_TIME + 1.1;
     if (this.t > 0.2 && counting && (this.app.input.pressed('Mouse0') || this.app.input.pressed('Space'))) this.t = 99;
-    rect(ctx, 0, 0, VIEW.w, VIEW.h, PAL.paper);
-    for (let x = 0; x < VIEW.w; x += 16) rect(ctx, x, 0, 1, VIEW.h, PAL.fog);
-    for (let y = 0; y < VIEW.h; y += 16) rect(ctx, 0, y, VIEW.w, 1, PAL.fog);
+    rect(this.app.world, 0, 0, 320, 180, PAL.paper);
     ui.begin();
-    rect(ctx, 0, 6, VIEW.w, 22, PAL.ink);
-    centerBig(ctx, `${def.id} ${def.name}`, VIEW.w / 2, 9, PAL.paper);
-    centerText(ctx, def.goal.kind === 'escape' ? 'ESCAPED' : def.goal.kind === 'survive' ? 'SURVIVED' : 'CLEARED', VIEW.w / 2, 19, PAL.cyan);
+    rect(ctx, 0, 0, UI.w, UI.h, PAL.paper);
+    for (let x = 0; x < UI.w; x += 16) rect(ctx, x, 0, 1, UI.h, PAL.fog);
+    for (let y = 0; y < UI.h; y += 16) rect(ctx, 0, y, UI.w, 1, PAL.fog);
+
+    // the header: the level's name and what you did
+    rect(ctx, 0, 14, UI.w, 44, PAL.ink);
+    rect(ctx, 0, 16, UI.w, 40, PAL.paper);
+    rect(ctx, 0, 54, UI.w, 2, PAL.cyan);
+    const word = def.goal.kind === 'escape' ? 'Escaped' : def.goal.kind === 'survive' ? 'Survived' : 'Cleared';
+    const title = `${def.id} ${def.name.toUpperCase()}`;
+    const tw = measure(title, 'shard') + 12 + measure(word) + 8;
+    const tx = Math.round((UI.w - tw) / 2);
+    text(ctx, title, tx, 26, PAL.ink, { face: 'shard' });
+    ui.chip(tx + measure(title, 'shard') + 12, 26, word, PAL.cyan);
+
+    // stars, stamping in after the lines
+    const after = this.t - r.lines.length * LINE_TIME - 0.2;
+    const names = ['Clear', 'Par', 'Challenge'];
+    const stamped = Math.max(0, Math.min(3, Math.floor(after / 0.3) + 1));
+    if (after > 0 && stamped > this.stamped) {
+      this.stamped = stamped;
+      if (r.stars[stamped - 1]) this.app.sound.play('star');
+    }
+    ui.card(24, 72, 168, 196);
+    for (let i = 0; i < 3; i++) {
+      const sx = 36, sy = 84 + i * 60;
+      const on = after > 0 && i < stamped && r.stars[i];
+      bigStar(ctx, sx, sy, on, 2);
+      text(ctx, names[i], sx + 34, sy + 4, on ? PAL.ink : PAL.stone);
+      if (on && r.fresh[i]) ui.chip(sx + 34, sy + 16, 'New', PAL.gold);
+      else if (i === 2) text(ctx, on ? 'Done' : 'Not this time', sx + 34, sy + 18, PAL.iron);
+    }
 
     // coin lines, one at a time
     const lines = Math.min(r.lines.length, Math.floor(this.t / LINE_TIME));
@@ -52,53 +79,47 @@ export class TallyScreen implements Screen {
       this.shown = lines;
       this.app.sound.play('coin', 0.7);
     }
-    const x0 = 64, x1 = 256;
+    const cx = 206, cw = 410;
+    ui.card(cx, 72, cw, 196);
     let total = 0;
     for (let i = 0; i < lines; i++) {
-      const l = r.lines[i], y = 36 + i * 9;
-      drawText(ctx, l.label, x0, y, l.label.startsWith('NEW STAR') ? PAL.amber : PAL.iron);
-      const n = `+${l.coins}`;
-      drawText(ctx, n, x1 - textWidth(n), y, PAL.amber);
+      const l = r.lines[i], y = 84 + i * 15;
+      const star = l.label.startsWith('New star');
+      text(ctx, l.label, cx + 12, y, star ? PAL.amber : PAL.ink);
+      text(ctx, `+${l.coins}`, cx + cw - 12, y, PAL.amber, { align: 'right' });
       total += l.coins;
     }
-    const ly = 36 + r.lines.length * 9 + 2;
+    const ly = 84 + r.lines.length * 15 + 4;
     if (lines === r.lines.length) {
-      rect(ctx, x0, ly, x1 - x0, 1, PAL.ash);
-      drawText(ctx, r.repeat ? 'TOTAL (REPEAT CLEAR: HALF PAY)' : 'TOTAL', x0, ly + 4, PAL.ink);
+      rect(ctx, cx + 12, ly, cw - 24, 2, PAL.ink);
+      text(ctx, r.repeat ? 'Total (a repeat clear pays half)' : 'Total', cx + 12, ly + 8, PAL.ink);
       const n = `${total}`;
-      drawText(ctx, n, x1 - textWidth(n) - 7, ly + 4, PAL.amber);
-      coinIcon(ctx, x1 - 5, ly + 4);
+      text(ctx, n, cx + cw - 12, ly + 6, PAL.ink, { face: 'shard', align: 'right' });
+      icon(ctx, 'coin', cx + cw - 24 - measure(n, 'shard'), ly + 8);
     }
+    const gs = r.ticks / TICK_RATE;
+    const ty = 236;
+    rect(ctx, cx + 12, ty - 6, cw - 24, 1, PAL.fog);
+    text(ctx, `Game ${gs.toFixed(1)} s`, cx + 12, ty, def.goal.kind === 'survive' || gs <= def.par ? PAL.tide : PAL.ink);
+    if (def.goal.kind !== 'survive') text(ctx, ` / par ${def.par}`, cx + 12 + measure(`Game ${gs.toFixed(1)} s`), ty, PAL.iron);
+    text(ctx, `Real ${this.play.realTime.toFixed(1)} s`, cx + 180, ty, PAL.iron);
+    if (r.best) ui.chip(cx + cw - 12 - measure('New best time') - 8, ty - 2, 'New best time', PAL.cyan);
+    const bank = `Bank ${this.app.save.coins}`;
+    text(ctx, bank, cx + cw - 12, 276, PAL.amber, { align: 'right' });
 
-    // stars, stamping in after the lines
-    const after = this.t - r.lines.length * LINE_TIME - 0.2;
-    const names = ['CLEAR', 'PAR', 'CHALLENGE'];
-    const stamped = Math.max(0, Math.min(3, Math.floor(after / 0.3) + 1));
-    if (after > 0 && stamped > this.stamped) {
-      this.stamped = stamped;
-      if (r.stars[stamped - 1]) this.app.sound.play('star');
-    }
-    for (let i = 0; i < 3; i++) {
-      const sx = 8, sy = 37 + i * 16;
-      const on = after > 0 && i < stamped && r.stars[i];
-      star(ctx, sx, sy, on);
-      drawText(ctx, names[i], sx + 10, sy + 1, on ? PAL.amber : PAL.ash);
-      if (on && r.fresh[i]) drawText(ctx, 'NEW', sx + 10, sy + 8, PAL.tide);
-    }
-    const gs = (r.ticks / TICK_RATE).toFixed(1);
-    drawText(ctx, `GAME ${gs} S / PAR ${def.par}`, x0, VIEW.h - 44, r.ticks / TICK_RATE <= def.par ? PAL.tide : PAL.slate);
-    drawText(ctx, `REAL ${this.play.realTime.toFixed(1)} S`, x0 + 110, VIEW.h - 44, PAL.slate);
-    if (r.best) drawText(ctx, 'NEW BEST TIME', x0, VIEW.h - 36, PAL.cyan);
+    // where next
     const next = nextLevel(def.id);
-    const by = VIEW.h - 26;
-    if (ui.button('next', 214, by, 90, 16, next ? 'NEXT  ENTER' : 'FINALE  ENTER', { primary: true, key: 'Enter' })) {
-      this.app.goto(next ? new PlayScreen(this.app, next.id) : new EndScreen(this.app));
+    const chapterEnd = !next || next.id.split('-')[0] !== def.id.split('-')[0];
+    const by = UI.h - 46;
+    plate(ctx, 0, by - 8, UI.w, 54, PAL.ink, null);
+    rect(ctx, 0, by - 6, UI.w, 52, PAL.paper);
+    if (ui.button('map', 24, by, 110, 30, 'Map', { cap: 'Esc', key: 'Escape' })) this.app.goto(new MapScreen(this.app, def.id));
+    if (ui.button('shop', 144, by, 150, 30, 'Workshop', { cap: 'W', key: 'KeyW' })) this.app.goto(new WorkshopScreen(this.app, def.id));
+    const rk = this.app.save.settings.keys.restart;
+    if (ui.button('retry', 304, by, 120, 30, 'Retry', { cap: keyLabel(rk), key: rk })) this.app.goto(new PlayScreen(this.app, def.id, true));
+    if (ui.button('next', 434, by, 182, 30, chapterEnd ? 'Onward' : 'Next level', { kind: 'primary', cap: 'Enter', key: 'Enter' })) {
+      this.app.goto(chapterEnd ? new EndScreen(this.app, def.id) : new PlayScreen(this.app, next!.id));
     }
-    if (ui.button('retry', 150, by, 58, 16, 'RETRY  R', { key: 'KeyR' })) this.app.goto(new PlayScreen(this.app, def.id, true));
-    if (ui.button('shop', 70, by, 74, 16, 'WORKSHOP  W', { key: 'KeyW' })) this.app.goto(new WorkshopScreen(this.app, def.id));
-    if (ui.button('map', 16, by, 48, 16, 'MAP  ESC', { key: 'Escape' })) this.app.goto(new MapScreen(this.app, def.id));
-    const bank = `BANK ${this.app.save.coins}`;
-    drawText(ctx, bank, VIEW.w - textWidth(bank) - 16, VIEW.h - 36, PAL.amber);
     ui.end();
   }
 }

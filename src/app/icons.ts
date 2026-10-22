@@ -1,5 +1,5 @@
-// Small 12×12 icons for the Workshop tracks, as pixel strings: '#' cyan (time and you), 'o' paper,
-// '+' slate. The atlas version replaces one when the art has it (icon_<track>).
+// Small 12×12 icons for the Workshop tracks, as pixel strings, drawn at 2× on the UI layer's paper cards:
+// '#' tide (time and you), 'o' ink, '+' stone.
 import type { TrackId } from '../data/upgrades';
 import { PAL } from '../data/palette';
 
@@ -38,15 +38,15 @@ const ICONS: Record<TrackId, string[]> = {
   ],
 };
 
-export function trackIcon(ctx: CanvasRenderingContext2D, id: TrackId, x: number, y: number) {
+export function trackIcon(ctx: CanvasRenderingContext2D, id: TrackId, x: number, y: number, scale = 2) {
   const rows = ICONS[id];
-  const colors: Record<string, string> = { '#': PAL.cyan, o: PAL.paper, '+': PAL.slate };
+  const colors: Record<string, string> = { '#': PAL.tide, o: PAL.ink, '+': PAL.stone };
   rows.forEach((r, j) => {
     for (let i = 0; i < r.length; i++) {
       const c = colors[r[i]];
       if (!c) continue;
       ctx.fillStyle = c;
-      ctx.fillRect(x + i, y + j, 1, 1);
+      ctx.fillRect(x + i * scale, y + j * scale, scale, scale);
     }
   });
 }

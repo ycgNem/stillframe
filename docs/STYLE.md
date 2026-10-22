@@ -54,7 +54,7 @@ Every pixel of every sprite is one of these. Code draws only with `PAL.<name>`.
 | Coin | 7×7, 4-frame spin | |
 | Bullet | 1–2 px head + streak | streak = 7 px of the bullet's path behind it |
 | Tiles | 16×16; walls show an 8 px face | |
-| Text | 3×5 font (HUD), 5×7 font (headings, M6) | `paper` or `ink`, never colored except red warnings |
+| Text | two bitmap faces on the UI layer (§8) | `ink` on paper cards; color only for roles (§8) |
 
 ## 4. Rendering of forms
 
@@ -65,8 +65,29 @@ Every pixel of every sprite is one of these. Code draws only with `PAL.<name>`.
   not skin. Faceless.
 - **Player:** a pale mannequin (`paper`/`fog`/`ash` body, `ink` outline) with a 2 px `cyan` visor that
   faces the aim direction. Readable on the white floor because of the outline and shadow.
+- **Each red kind has one mark** that reads at ×1, so you know what you face before it moves: the
+  Grunt's cut-crystal crown, the Gunner's goggle band, the Brute's bulk, the Runner's swept fin and
+  slight build, the Sniper's hood and single `glint` lens, the Mirror's polished `glint` face and
+  diamond plate, the Splitter's `wine` crack from crown to hips, the Shard's tiny crowned body. Bosses
+  are 40–48 px: the Manager's tie, the Conductor's peaked cap and buttons, the Foreman's hard hat and
+  reflective stripe, the DJ's headphones and shades. The Frame's eyes are red glass almonds floating
+  over a shadow, drawn shut (a lid line) while they shrug off bullets.
+- **What bosses throw** is grey, never ink: you can't pick it up (the desk, a steel beam, a `coal`
+  record with a `hot` label).
 - **World geometry:** no outlines; shapes read by value steps (top faces lighter than south faces,
   `fog` grout on `paper` floors). Props are blocky and simple, SUPERHOT-like.
+- **Each chapter has a theme** (`LevelDef.theme`, drawn in `src/render/level.ts`), all inside the
+  world's greys so red still owns danger: **office** (paper tiles, carpet, desks); **subway** (small
+  platform tiles, a dotted strip at the platform edge, white tiled walls, `coal` track beds with `iron`
+  sleepers and `ash` rails); **roof** (speckled gravel, darker concrete walls, the drop as `ink` with a
+  few `iron` windows far below and a stone lip); **club** (stone floor, `iron`/`coal` walls, a dance
+  floor of `coal` squares in an `iron` grid); **core** (the frame's white with contact-sheet corner
+  marks, `coal` walls punched with `paper` sprocket holes like film).
+- **Hazards are drawn red only where they kill:** a train's side has a `red` stripe and its rails light
+  red while it's coming; the crane hook's shadow is ringed with red dots; dance-floor tiles turn red
+  before the drop; the Conductor's landing is a red target. Gravity wells are grey rings falling inward
+  (they bend, they don't kill). In a **strobe** room the dark between flashes keeps only what matters:
+  lit tiles, reds (`hot` with an `ink` rim), bullets, you, and items as grey shapes.
 - **Shatter:** the red's own sprite pixels break into 1–3 px fragments that fly and spin in game time
   (frozen time freezes them mid-air, which is the best moment in the game). Fragments fade by dither,
   never by alpha.
@@ -115,5 +136,34 @@ Every pixel of every sprite is one of these. Code draws only with `PAL.<name>`.
 6. Record the actual cost from the tool's receipt in the ledger.
 
 ### Into the game (M6)
-`scripts/build-atlas.mjs` packs every `pixel-art/*/export/` into `src/art/sheet.png` + `sheet.json`
-(names, frames, pivots). The renderer loads only the atlas.
+`python pixel-art/build_atlas.py [--all]` packs every `pixel-art/*/export/` into `src/art/sheet.png` +
+`sheet.json` (names, frames, pivots); `--all` reruns every build script first. The renderer loads only
+the atlas. `pixel-art/fonts/sheet.py` renders the two UI faces from `src/ui/fonts.ts` for looking.
+
+## 8. Type and UI (the UI layer)
+
+The words have to be easy to read, at a glance, mid-fight. The rule of thumb: **the opposite of a
+thin pale terminal font on dark slate.** Bold letters, ordinary sentences, dark ink on light paper.
+
+- **Two layers.** The world is drawn at 320×180 game pixels. Text and UI are drawn on their own
+  **640×360 UI layer** (one UI pixel is half a game pixel), composited over the world at the device's
+  scale. Letters get real shapes without shrinking the world's pixels. Both layers stay crisp: whole
+  pixels only, no smoothing.
+- **Two faces** (`src/ui/fonts.ts`, drawn as row strings, previewed by `pixel-art/fonts/sheet.py`):
+  - **Pane**, the reading face: 8 px cap height, **2 px verticals** (1 px horizontals), real lowercase
+    with ascenders and descenders, 12 px line height. Everything you read is Pane.
+  - **Shard**, the display face: 11 px caps, 3 px verticals, faceted corners like broken glass. Titles, level
+    names, the big words (PAUSED, SHATTERED, CLEARED), and numbers that matter (coins).
+- **Sentence case** for everything you read ("Shatter every red", "Finish the level"). Capitals only
+  for Shard titles and banners (WAVE 3).
+- **Ink on paper.** Text is `ink` on `paper`/`fog` cards. Secondary text is `iron`; quiet hints
+  `slate`. Color is a role, never decoration: `blood` for danger words, `tide` for time and tips,
+  `amber` for coin and star lines. Words over the world get a `paper` outline.
+- **Cards, not panels.** Every block of UI is a paper card with cut corners and a hard `stone` shadow
+  down-right (`plate()` in `src/ui/kit.ts`). Buttons are cards with a lip that presses down; primary
+  buttons are `cyan` (you), danger ones `red`. A veil of paper dither dims the world behind a card.
+- **Rich text** (`src/ui/text.ts`): `[Key]` draws a keycap with the player's own binding (`[LMB]`,
+  `[RMB]`, `[WHEEL]` draw a mouse); `{coin}`, `{star}`, `{red}`, `{time}`, `{lock}`, `{skull}` draw
+  icons; `*word*` takes the accent color. Tips teach with keycaps, not with words for keys.
+- **Readability checks** for every screen: a sentence can be read at 1280×720 from arm's length; no
+  card hides the player or a red (HUD cards step aside); nothing important is only a color.

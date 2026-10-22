@@ -1,10 +1,11 @@
-// What the player does in one tick: dash, walk, swap, pick up, shoot, punch, throw.
+// What the player does in one tick: dash, walk, swap, pick up, shoot, slash, punch, throw.
 import { ITEMS } from '../data/items';
+import { REDS, TOUGH_STEADY } from '../data/reds';
 import { COMBAT, FRAMESKIP, PLAYER, TICK_RATE, TILE } from '../data/tuning';
 import { TIER_VALUES } from '../data/upgrades';
 import { boxBlocked, moveBody } from './grid';
-import { disarm, hurtRed } from './kills';
-import { randRange } from './rng';
+import { disarm, hurtRed, shove } from './kills';
+import { fireGun, parried } from './shots';
 import type { Held, Item, Player, Red, SimEvent, TickInput, World } from './types';
 
 const DT = 1 / TICK_RATE;
@@ -43,20 +44,35 @@ export function stepPlayer(w: World, input: TickInput, ev: SimEvent[]) {
   p.dashCd = Math.max(0, p.dashCd - DT);
   p.actT += DT;
 
+  // the mirror glitch (chapter 5) swaps left and right; the aim still follows the mouse
+  if (w.glitch === 'mirror') input = { ...input, mx: -input.mx };
   if (input.dash) dash(w, ev);
   walk(w, input);
   if (input.swap && p.hands.length === 2) {
     p.hands.push(p.hands.shift()!);
+    p.burstLeft = 0;
     ev.push({ t: 'pickup', x: p.x, y: p.y, item: p.hands[0].kind, who: 'player' });
   }
   if (input.pick) {
     const it = pickTarget(w, input.pick);
     if (it) take(w, it, ev);
   }
-  if (input.alt && p.hands.length && p.cooldown <= 0) throwHeld(w, ev);
-  if (input.fire && p.cooldown <= 0) {
+  // the rest of a burst gun's burst
+  if (p.burstLeft > 0) {
+    p.burstT -= DT;
+    const h = p.hands[0];
+    if (!h || !ITEMS[h.kind].burst || h.ammo <= 0) p.burstLeft = 0;
+    else if (p.burstT <= 0) {
+      round(w, h, ev);
+      p.burstLeft--;
+      p.burstT = ITEMS[h.kind].burstGap ?? 0;
+    }
+  }
+  if (input.alt && p.hands.length && p.cooldown <= 0 && p.burstLeft <= 0) throwHeld(w, ev);
+  if (input.fire && p.cooldown <= 0 && p.burstLeft <= 0) {
     const h = p.hands[0];
     if (!h) punch(w, ev);
+    else if (ITEMS[h.kind].blade) slash(w, h, ev);
     else if (ITEMS[h.kind].gun && h.ammo > 0) shoot(w, h, ev);
     else throwHeld(w, ev);
   }
@@ -115,7 +131,7 @@ function dash(w: World, ev: SimEvent[]) {
     if (boxBlocked(w, nx, ny, p.r, 'player')) break;
     x = nx;
     y = ny;
-    for (const r of w.reds) if (!r.dead && !crossed.includes(r) && Math.hypot(r.x - x, r.y - y) < r.r + p.r) crossed.push(r);
+    for (const r of w.reds) if (!r.dead && !r.hidden && !crossed.includes(r) && Math.hypot(r.x - x, r.y - y) < r.r + p.r) crossed.push(r);
   }
   p.x = p.px = x;
   p.y = p.py = y;
@@ -132,6 +148,7 @@ function take(w: World, it: Item, ev: SimEvent[]) {
     held.ammo += TIER_VALUES.magBonus[w.mods.mag];
     held.boosted = true;
   }
+  p.burstLeft = 0;
   if (p.hands.length === 0) p.hands.push(held);
   else if (w.mods.holster && p.hands.length === 1) p.hands.unshift(held);
   else {
@@ -145,21 +162,56 @@ function take(w: World, it: Item, ev: SimEvent[]) {
 
 function shoot(w: World, h: Held, ev: SimEvent[]) {
   const p = w.player, def = ITEMS[h.kind];
-  h.ammo--;
   p.cooldown = def.cooldown;
   p.act = 'shoot';
   p.actT = 0;
   w.stats.shots++;
-  for (let i = 0; i < def.pellets; i++) {
-    const a = def.pellets > 1 ? p.aim + (i / (def.pellets - 1) - 0.5) * def.spread + randRange(w, -0.03, 0.03) : p.aim;
-    const dx = Math.cos(a), dy = Math.sin(a);
-    const x = p.x + dx * (p.r + 3), y = p.y + dy * (p.r + 3);
-    w.bullets.push({
-      id: w.nextId++, x, y, px: x, py: y, vx: dx * def.speed, vy: dy * def.speed,
-      from: 'player', owner: p.id, life: def.range, damage: def.damage, hit: false,
-    });
+  round(w, h, ev);
+  if (def.burst && def.burst > 1) {
+    p.burstLeft = def.burst - 1;
+    p.burstT = def.burstGap ?? 0;
   }
-  ev.push({ t: 'shot', x: p.x + Math.cos(p.aim) * (p.r + 3), y: p.y + Math.sin(p.aim) * (p.r + 3), aim: p.aim, item: h.kind, from: 'player' });
+}
+
+/** One round out of the gun in your hand. */
+function round(w: World, h: Held, ev: SimEvent[]) {
+  const p = w.player;
+  h.ammo--;
+  fireGun(w, ITEMS[h.kind], h.kind, p.x + Math.cos(p.aim) * (p.r + 3), p.y + Math.sin(p.aim) * (p.r + 3), p.aim, 'player', p.id, ev);
+}
+
+/** The katana: everything in the arc in front of you is cut, bullets and throws included (parries). */
+function slash(w: World, h: Held, ev: SimEvent[]) {
+  const p = w.player, blade = ITEMS[h.kind].blade!;
+  p.cooldown = ITEMS[h.kind].cooldown;
+  p.act = 'punch';
+  p.actT = 0;
+  w.stats.punches++;
+  ev.push({ t: 'slash', x: p.x, y: p.y, aim: p.aim, from: 'player' });
+  const reach = p.r + blade.reach;
+  for (const r of w.reds) {
+    if (r.dead || r.hidden) continue;
+    const d = Math.hypot(r.x - p.x, r.y - p.y);
+    if (d - r.r > reach || (d > r.r + p.r && angleDiff(Math.atan2(r.y - p.y, r.x - p.x), p.aim) > blade.arc / 2)) continue;
+    disarm(w, r, p.x, p.y, ev);
+    hurtRed(w, r, ITEMS[h.kind].damage, 'slash', ev, { aim: p.aim });
+  }
+  for (const b of w.bullets) {
+    if (b.from !== 'red' || b.life <= 0) continue;
+    const d = Math.hypot(b.x - p.x, b.y - p.y);
+    if (d > reach + 6 || angleDiff(Math.atan2(b.y - p.y, b.x - p.x), p.aim) > blade.arc / 2) continue;
+    b.life = 0;
+    b.hit = true;
+    parried(w, b.x, b.y, ev);
+  }
+  for (const t of w.thrown) {
+    if (t.from !== 'red' || t.life <= 0) continue;
+    const d = Math.hypot(t.x - p.x, t.y - p.y);
+    if (d > reach + t.r || angleDiff(Math.atan2(t.y - p.y, t.x - p.x), p.aim) > blade.arc / 2) continue;
+    t.life = -1;
+    parried(w, t.x, t.y, ev);
+    ev.push({ t: 'break', x: t.x, y: t.y, item: t.kind });
+  }
 }
 
 function punch(w: World, ev: SimEvent[]) {
@@ -174,13 +226,20 @@ function punch(w: World, ev: SimEvent[]) {
   if (!target) return;
   const a = Math.atan2(target.y - p.y, target.x - p.x);
   disarm(w, target, p.x, p.y, ev);
-  target.stun = Math.max(target.stun, PLAYER.punchStun);
-  if (target.state !== 'enter' && target.state !== 'charge') {
-    target.state = 'move';
-    target.t = 0;
+  // a heavy red (a Brute, a boss) is rocked by the first punch, then shrugs punches off for a while, and
+  // it's too heavy to knock back: like throws, fists can't stun-lock it or walk it off a roof
+  const tough = !!REDS[target.kind].tough;
+  if (!tough || target.steady <= 0) {
+    target.stun = Math.max(target.stun, PLAYER.punchStun);
+    if (target.state !== 'enter' && target.state !== 'charge') {
+      target.state = 'move';
+      target.t = 0;
+    }
+    if (tough) target.steady = TOUGH_STEADY;
   }
-  moveBody(w, target, Math.cos(a) * PLAYER.punchKnock, Math.sin(a) * PLAYER.punchKnock, 'red');
   hurtRed(w, target, PLAYER.punchDamage, 'punch', ev, { aim: a });
+  // a knock back; at a roof's edge, over it goes
+  if (!tough) shove(w, target, Math.cos(a) * PLAYER.punchKnock, Math.sin(a) * PLAYER.punchKnock, ev);
 }
 
 /** Who a punch thrown now would hit: of the reds in reach and in the cone, the one closest to where you
@@ -189,7 +248,7 @@ export function punchTarget(w: World, aim: number): Red | null {
   const p = w.player;
   let target: Red | null = null, bestA = Infinity;
   for (const r of w.reds) {
-    if (r.dead) continue;
+    if (r.dead || r.hidden) continue;
     const d = Math.hypot(r.x - p.x, r.y - p.y);
     if (d - r.r - p.r > PLAYER.punchReach) continue;
     const a = angleDiff(Math.atan2(r.y - p.y, r.x - p.x), aim);
@@ -205,6 +264,7 @@ function throwHeld(w: World, ev: SimEvent[]) {
   const p = w.player;
   const h = p.hands.shift();
   if (!h) return;
+  p.burstLeft = 0;
   const speed = PLAYER.throwSpeed * TIER_VALUES.armSpeed[w.mods.arm];
   const dx = Math.cos(p.aim), dy = Math.sin(p.aim);
   const x = p.x + dx * (p.r + 2), y = p.y + dy * (p.r + 2);

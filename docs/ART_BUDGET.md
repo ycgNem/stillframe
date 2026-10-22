@@ -4,7 +4,7 @@
 account has more (1,344.9 left on 2026-10-22, resets 2026-11-09), but that allowance is shared with
 every other project; this project gets 100.
 
-**Spent so far: 0 / 100.**
+**Spent so far: 0 / 100.** Every chapter's art, 1 to 5, was made by hand in build scripts.
 
 ## Rules
 
@@ -67,3 +67,4 @@ every other project; this project gets 100.
 | Date | Asset | Call | Est. | Actual | Running total | Notes |
 |---|---|---|---|---|---|---|
 | — | — | — | — | — | 0 | nothing spent yet |
+| 2026-10-22 | Phases B–D (chapters 2–5: Runner, Sniper, Mirror, Splitter, Shard, Conductor, Foreman, DJ, the Frame's eyes; SMG, rifle, katana, beam, record; turnstile, pillar, bench, girders, crate, speakers, DJ desk; subway, roof, club and core tiles) | none | 0 | 0 | 0 | all hand-made instead: `pixel-art/actors/build.py` and `pixel-art/items/build.py` for sprites, `src/render/level.ts` for tiles and props. Phase B's 30 and phases C–D's 18 are unspent |

@@ -4,10 +4,10 @@ import type { LevelDef } from './types';
 
 export const CH1: LevelDef[] = [
   {
-    id: '1-1', name: 'ELEVATOR', seed: 101,
+    id: '1-1', name: 'Elevator', seed: 101,
     goal: { kind: 'clear' }, par: 13,
-    challenge: { id: 'punchKills', n: 1 }, challengeText: 'PUNCH A RED TO PIECES',
-    tip: 'STAND STILL TO THINK. EVERY STEP RUNS THE CLOCK.',
+    challenge: { id: 'punchKills', n: 1 }, challengeText: 'Punch a red to pieces',
+    tip: 'Stand still to think. Every step runs the clock.',
     floor: '.',
     map: [
       '####################',
@@ -23,16 +23,16 @@ export const CH1: LevelDef[] = [
       '   #################',
     ],
     signs: [
-      { x: 9, y: 1, text: 'TIME MOVES WHEN YOU MOVE' },
-      { x: 4, y: 8, text: 'STAND STILL TO THINK' },
+      { x: 9, y: 1, text: 'Time moves when you move' },
+      { x: 4, y: 8, text: 'Stand still to think' },
     ],
     waves: [{ when: 'clear', reds: [{ kind: 'grunt', door: 0 }, { kind: 'grunt', door: 0 }] }],
   },
   {
-    id: '1-2', name: 'CUBICLES', seed: 102,
+    id: '1-2', name: 'Cubicles', seed: 102,
     goal: { kind: 'clear' }, par: 8,
-    challenge: { id: 'fists' }, challengeText: 'FISTS ONLY: NO SHOTS, NO THROWS',
-    tip: 'PUNCH AN ARMED RED AND ITS GUN DROPS. CLICK A GUN TO TAKE IT.',
+    challenge: { id: 'fists' }, challengeText: 'Fists only: no shots, no throws',
+    tip: 'Punch an armed red and its gun drops. Click a gun to take it.',
     map: [
       '####################',
       '#P.....#......q....#',
@@ -49,10 +49,10 @@ export const CH1: LevelDef[] = [
     waves: [],
   },
   {
-    id: '1-3', name: 'BREAK ROOM', seed: 103,
+    id: '1-3', name: 'Break Room', seed: 103,
     goal: { kind: 'clear' }, par: 16,
-    challenge: { id: 'stunKills', n: 3 }, challengeText: '3 KILLS ON STUNNED REDS',
-    tip: 'RIGHT CLICK THROWS. A HIT STUNS AND DISARMS. THEN FINISH IT.',
+    challenge: { id: 'stunKills', n: 3 }, challengeText: 'Shatter 3 reds while they are stunned',
+    tip: '[RMB] throws. A hit stuns and disarms, then finish it.',
     map: [
       '####################',
       '#KKKKK....VV....W..#',
@@ -69,10 +69,10 @@ export const CH1: LevelDef[] = [
     waves: [{ when: 'clear', reds: [{ kind: 'grunt', door: 0 }, { kind: 'grunt', door: 0, item: 'bottle' }] }],
   },
   {
-    id: '1-4', name: 'COPY ROOM', seed: 104,
+    id: '1-4', name: 'Copy Room', seed: 104,
     goal: { kind: 'clear' }, par: 15,
-    challenge: { id: 'noMiss' }, challengeText: 'NO MISSED SHOTS',
-    tip: 'BULLETS GO THROUGH GLASS. AN EMPTY GUN STILL MAKES A GOOD BRICK.',
+    challenge: { id: 'noMiss' }, challengeText: 'No missed shots',
+    tip: 'Bullets go through glass. An empty gun still makes a good brick.',
     map: [
       '####################',
       '#P.p...#....C...G..#',
@@ -89,10 +89,10 @@ export const CH1: LevelDef[] = [
     waves: [{ when: 'clear', reds: [{ kind: 'gunner', door: 0 }, { kind: 'grunt', door: 0 }] }],
   },
   {
-    id: '1-5', name: 'CONFERENCE', seed: 105,
+    id: '1-5', name: 'Conference', seed: 105,
     goal: { kind: 'clear' }, par: 28,
-    challenge: { id: 'combo', n: 3 }, challengeText: 'A 3-KILL COMBO (EACH WITHIN 1 S)',
-    tip: 'THEY KEEP COMING THROUGH THE DOORS. WATCH YOUR BACK.',
+    challenge: { id: 'combo', n: 3 }, challengeText: 'A 3-kill combo',
+    tip: 'They keep coming through the doors. Watch your back.',
     map: [
       '######D########D######',
       '#....................#',
@@ -115,10 +115,10 @@ export const CH1: LevelDef[] = [
     ],
   },
   {
-    id: '1-6', name: 'STAIRWELL', seed: 106,
+    id: '1-6', name: 'Stairwell', seed: 106,
     goal: { kind: 'escape' }, par: 9,
-    challenge: { id: 'noKills' }, challengeText: 'ESCAPE WITHOUT SHATTERING ANYONE',
-    tip: 'GET TO THE EXIT AT THE TOP. FIGHTING IS OPTIONAL.',
+    challenge: { id: 'noKills' }, challengeText: 'Escape without shattering anyone',
+    tip: 'Get to the exit at the top. Fighting is optional.',
     map: [
       '################',
       '#X.....#.......#',
@@ -153,10 +153,10 @@ export const CH1: LevelDef[] = [
     ],
   },
   {
-    id: '1-7', name: 'SERVER CLOSET', seed: 107,
+    id: '1-7', name: 'Server Closet', seed: 107,
     goal: { kind: 'survive', seconds: 30 }, par: 30,
-    challenge: { id: 'kills', n: 8 }, challengeText: 'SHATTER 8 REDS BEFORE TIME IS UP',
-    tip: 'HOLD OUT FOR 30 SECONDS. ONLY MOVING TIME COUNTS.',
+    challenge: { id: 'kills', n: 8 }, challengeText: 'Shatter 8 reds before time is up',
+    tip: 'Hold out for 30 seconds. Only moving time counts.',
     map: [
       '####################',
       'D..................D',
@@ -181,10 +181,10 @@ export const CH1: LevelDef[] = [
     ],
   },
   {
-    id: '1-8', name: 'THE MANAGER', seed: 108,
-    goal: { kind: 'clear' }, par: 24,
-    challenge: { id: 'bossPunch' }, challengeText: 'FINISH THE MANAGER WITH A PUNCH',
-    tip: 'HE THROWS DESKS: SHOOT THEM OUT OF THE AIR, OR STEP ASIDE.',
+    id: '1-8', name: 'The Manager', seed: 108,
+    goal: { kind: 'clear' }, par: 53,
+    challenge: { id: 'bossPunch' }, challengeText: 'Finish the Manager with a punch',
+    tip: 'It throws desks. Shoot them out of the air, or step aside.',
     map: [
       '########################',
       '#......................#',

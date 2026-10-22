@@ -1,13 +1,13 @@
 // Turns a level's ASCII map (src/data/levels) into a fresh World.
 import { ITEMS, ITEM_LETTERS, type ItemKind } from '../data/items';
 import type { LevelDef } from '../data/levels/types';
-import { RED_LETTERS, REDS, type RedKind } from '../data/reds';
+import { FRAME, RED_LETTERS, REDS, type RedKind } from '../data/reds';
 import { PLAYER, TILE } from '../data/tuning';
 import { TIER_VALUES } from '../data/upgrades';
-import { TILE_DOOR, TILE_FLOOR, TILE_GLASS, TILE_PROP, TILE_VOID, TILE_WALL } from './grid';
+import { TILE_DOOR, TILE_DROP, TILE_FLOOR, TILE_GLASS, TILE_PROP, TILE_VOID, TILE_WALL } from './grid';
 import type { Held, Mods, Red, Stats, World } from './types';
 
-export const PROPS = 'TCSFVOWKHR';
+export const PROPS = 'TCSFVOWKHRALNIUQJ';
 
 export const NO_MODS: Mods = {
   stride: 0, trigger: 0, shield: 0, frameskip: 0, rewind: 0, arm: 0, mag: 0, reach: 0, holster: false, loadout: null,
@@ -17,7 +17,7 @@ export function emptyStats(): Stats {
   return {
     kills: 0, shots: 0, throws: 0, punches: 0, punchKills: 0, stunKills: 0, throwKills: 0, ricochetKills: 0,
     dashKills: 0, parries: 0, pickups: 0, misses: 0, shieldsUsed: 0, rewinds: 0, maxCombo: 0, firstKill: '',
-    bossPunch: false, killCoins: 0, comboCoins: 0, styleCoins: 0,
+    bossPunch: false, hazardKills: 0, dropKills: 0, slashKills: 0, bossDrops: false, killCoins: 0, comboCoins: 0, styleCoins: 0,
   };
 }
 
@@ -35,8 +35,8 @@ export function makeRed(w: World, kind: RedKind, x: number, y: number, item: Ite
     id: w.nextId++, x, y, px: x, py: y, r: def.radius, walked: 0,
     kind, hp: def.hp, aim: Math.PI / 2, state: 'move', t: 0,
     held: held ? freshHeld(held) : null,
-    cooldown: 0.6, stun: 0, stunByThrow: false, strafe: 1, strafeT: 1, cvx: 0, cvy: 0, hurt: 0, phase: 0,
-    chargeCd: 1.5, guard: 0, steady: 0, grabCd: 0, dead: false,
+    cooldown: 0.6, stun: 0, stunByThrow: false, strafe: 1, strafeT: def.zigzag ? 0.3 : 1, cvx: 0, cvy: 0, hurt: 0, phase: 0,
+    chargeCd: 1.5, guard: 0, steady: 0, grabCd: 0, hidden: false, tx: x, ty: y, timer: 0, dead: false,
   };
 }
 
@@ -48,14 +48,17 @@ export function createWorld(def: LevelDef, mods: Mods = NO_MODS): World {
     level: def.id, goal: def.goal, challenge: def.challenge, par: def.par,
     tick: 0, rng: def.seed >>> 0, status: 'play', nextId: 1,
     cols, rows, tiles: [], look: [], tilesVersion: 0, doors: [], exit: null,
-    flow: [], flowAt: -2, flowVersion: -1,
+    flow: [], flowAt: -2, flowVersion: -1, flowHazard: -1,
     player: {
       id: 0, x: 0, y: 0, px: 0, py: 0, r: PLAYER.radius, walked: 0, vx: 0, vy: 0, aim: -Math.PI / 2,
       hands: [], cooldown: 0, actT: 9, act: 'none', shield: TIER_VALUES.shieldHits[mods.shield], grace: 0, dashCd: 0,
+      burstLeft: 0, burstT: 0,
     },
     reds: [], bullets: [], items: [], thrown: [],
     waveDefs: def.waves, bossWaves: def.bossWaves ?? [],
+    trackDefs: def.trains ?? [], hookDefs: def.hooks ?? [], beatDef: def.beat ?? null, wells: def.wells ?? [], glitch: def.glitch ?? null,
     waves: { next: 0, timer: -1, pending: [], started: 1 },
+    trains: [], hotRows: [], hazardVersion: 0, hooks: [], beat: { lit: [], dropIn: def.beat ? def.beat.bar : 0, bars: 0 }, echoes: [],
     combo: { count: 0, timer: 0 },
     surviveLeft: def.goal.kind === 'survive' ? def.goal.seconds : 0,
     mods, stats: emptyStats(),
@@ -68,6 +71,7 @@ export function createWorld(def: LevelDef, mods: Mods = NO_MODS): World {
       let tile = TILE_FLOOR, look = ch;
       if (ch === ' ') tile = TILE_VOID;
       else if (ch === '#' || ch === 'E') tile = TILE_WALL;
+      else if (ch === '~') tile = TILE_DROP;
       else if (ch === '=') tile = TILE_GLASS;
       else if (ch === 'D') {
         tile = TILE_DOOR;
@@ -83,9 +87,12 @@ export function createWorld(def: LevelDef, mods: Mods = NO_MODS): World {
         look = floor;
       } else if (RED_LETTERS[ch]) {
         const spec = RED_LETTERS[ch];
-        w.reds.push(makeRed(w, spec.kind, cx, cy, spec.item));
+        const r = makeRed(w, spec.kind, cx, cy, spec.item);
+        // the Frame's eyes take turns with their rings rather than all firing at once
+        if (r.kind === 'eye') r.timer = FRAME.ringEvery * 0.4 + w.reds.filter((o) => o.kind === 'eye').length * FRAME.ringStagger;
+        w.reds.push(r);
         look = floor;
-      } else if (ch !== '.' && ch !== ',') throw new Error(`level ${def.id}: unknown map letter '${ch}' at ${x},${y}`);
+      } else if (ch !== '.' && ch !== ',' && ch !== '_' && ch !== ':') throw new Error(`level ${def.id}: unknown map letter '${ch}' at ${x},${y}`);
       w.tiles.push(tile);
       w.look.push(look);
     }
@@ -95,13 +102,14 @@ export function createWorld(def: LevelDef, mods: Mods = NO_MODS): World {
     for (let x = 0; x < cols; x++) {
       const ch = def.map[y][x];
       if (ch !== 'P' && !ITEM_LETTERS[ch] && !RED_LETTERS[ch]) continue;
-      let carpet = 0, tiles = 0;
+      // the floor most of its neighbours have
+      const count: Record<string, number> = {};
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const n = def.map[y + dy]?.[x + dx];
-        if (n === ',') carpet++;
-        if (n === '.') tiles++;
+        if (n === ',' || n === '.' || n === ':' || n === '_') count[n] = (count[n] ?? 0) + 1;
       }
-      if (carpet !== tiles) w.look[y * cols + x] = carpet > tiles ? ',' : '.';
+      const best = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+      if (best && best[1] > (count[floor] ?? 0)) w.look[y * cols + x] = best[0];
     }
   }
   if (mods.loadout) w.player.hands.push(freshHeld(mods.loadout, mods));

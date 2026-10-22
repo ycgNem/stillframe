@@ -1,7 +1,7 @@
 // Game state is plain data (CLAUDE.md rule 7): it survives a JSON round-trip, so it can be snapshotted
 // for Rewind, compared in replay tests, and saved.
 import type { ItemKind } from '../data/items';
-import type { ChallengeId, Goal, SpawnDef, WaveDef } from '../data/levels/types';
+import type { BeatDef, ChallengeId, Glitch, Goal, HookDef, SpawnDef, TrackDef, WaveDef, WellDef } from '../data/levels/types';
 import type { RedKind } from '../data/reds';
 
 export interface Body {
@@ -41,10 +41,14 @@ export interface Player extends Body {
   /** nothing hurts you while this runs (after a shield breaks) */
   grace: number;
   dashCd: number;
+  /** rounds still to come of a burst gun's burst, and game seconds until the next */
+  burstLeft: number;
+  burstT: number;
 }
 
 export type RedState =
-  | 'enter' | 'move' | 'windup' | 'recover' | 'aim' | 'throwTell' | 'chargeTell' | 'charge' | 'deskTell';
+  | 'enter' | 'move' | 'windup' | 'recover' | 'aim' | 'throwTell' | 'chargeTell' | 'charge' | 'deskTell'
+  | 'board' | 'ride' | 'land' | 'climb' | 'ringTell';
 
 export interface Red extends Body {
   kind: RedKind;
@@ -77,6 +81,13 @@ export interface Red extends Body {
   steady: number;
   /** game seconds until it may pick something up again (just disarmed) */
   grabCd: number;
+  /** off the floor (riding a train, in mid-leap, climbing back up): nothing touches it and it touches nothing */
+  hidden: boolean;
+  /** a point it is headed for (a landing spot, the door it climbs back through) */
+  tx: number;
+  ty: number;
+  /** game seconds on a boss's own clock (the Conductor's time on the platform, an eye's next ring) */
+  timer: number;
   dead: boolean;
 }
 
@@ -96,6 +107,10 @@ export interface Bullet {
   damage: number;
   /** it hit something (for the No Miss challenge) */
   hit: boolean;
+  /** it goes on through reds it shatters (the rifle) */
+  pierce: boolean;
+  /** turned back by a Mirror */
+  bounced: boolean;
 }
 
 /** An item lying on the floor. */
@@ -152,7 +167,10 @@ export interface TickInput {
 
 export type Status = 'play' | 'dead' | 'clear';
 
-export type KillCause = 'bullet' | 'punch' | 'throw' | 'dash' | 'charge' | 'friendly';
+export type KillCause = 'bullet' | 'punch' | 'throw' | 'dash' | 'charge' | 'friendly' | 'slash' | 'train' | 'hook' | 'beat' | 'fall';
+
+/** What killed you when it wasn't a red: the death card names it. */
+export type Hazard = 'train' | 'hook' | 'beat' | 'landing';
 
 export type SimEvent =
   | { t: 'shot'; x: number; y: number; aim: number; item: ItemKind; from: 'player' | 'red' }
@@ -168,14 +186,23 @@ export type SimEvent =
   | { t: 'parry'; x: number; y: number }
   | { t: 'shield'; x: number; y: number }
   | { t: 'dash'; x: number; y: number; x2: number; y2: number }
-  | { t: 'tell'; x: number; y: number; id: number; what: 'punch' | 'aim' | 'throw' | 'charge' | 'desk' }
+  | { t: 'tell'; x: number; y: number; id: number; what: 'punch' | 'aim' | 'throw' | 'charge' | 'desk' | 'board' | 'land' | 'ring' }
+  | { t: 'slash'; x: number; y: number; aim: number; from: 'player' | 'red' }
+  | { t: 'reflect'; x: number; y: number }
+  | { t: 'fall'; x: number; y: number; id: number; kind: RedKind }
+  | { t: 'split'; x: number; y: number }
+  | { t: 'warn'; what: 'train' | 'beat'; x: number; y: number }
+  | { t: 'train'; x: number; y: number }
+  | { t: 'land'; x: number; y: number }
+  | { t: 'beat'; n: number }
+  | { t: 'drop'; x: number; y: number }
   | { t: 'wall'; x: number; y: number }
   | { t: 'deflect'; x: number; y: number }
   | { t: 'wave'; n: number }
   | { t: 'spawn'; x: number; y: number; door: number }
   | { t: 'phase'; n: number }
   | { t: 'empty'; x: number; y: number }
-  | { t: 'death'; x: number; y: number; aim: number; by: number }
+  | { t: 'death'; x: number; y: number; aim: number; by: number; what?: Hazard }
   | { t: 'clear'; x: number; y: number };
 
 /** What the player bought, as the sim sees it. Tiers are 0 (not bought) to 3. */
@@ -213,6 +240,13 @@ export interface Stats {
   /** the kind of the first red you shattered, '' until then */
   firstKill: string;
   bossPunch: boolean;
+  /** shattered by a train, the hook or the beat (you lured them there) */
+  hazardKills: number;
+  /** pushed off a roof */
+  dropKills: number;
+  slashKills: number;
+  /** the boss's last fall finished it */
+  bossDrops: boolean;
   /** coins earned so far this attempt, by line */
   killCoins: number;
   comboCoins: number;
@@ -254,6 +288,7 @@ export interface World {
   flow: number[];
   flowAt: number;
   flowVersion: number;
+  flowHazard: number;
   player: Player;
   reds: Red[];
   bullets: Bullet[];
@@ -262,7 +297,24 @@ export interface World {
   /** the level's later waves and the boss's calls for help, copied in so a World is self-contained */
   waveDefs: WaveDef[];
   bossWaves: SpawnDef[][];
+  trackDefs: TrackDef[];
+  hookDefs: HookDef[];
+  beatDef: BeatDef | null;
+  wells: WellDef[];
+  glitch: Glitch | null;
   waves: WaveState;
+  /** where each train is this tick (empty when none is running), and which track rows are dangerous (a
+   *  train is due or passing): reds keep off those */
+  trains: { x: number; y: number; w: number; h: number; vx: number; track: number }[];
+  hotRows: number[];
+  /** bumps when hotRows changes, so the flow field knows */
+  hazardVersion: number;
+  /** where each crane hook is this tick */
+  hooks: { x: number; y: number }[];
+  /** the beat: dance-floor cells lit for the next drop, and game seconds until it */
+  beat: { lit: number[]; dropIn: number; bars: number };
+  /** shots to be fired again (the echo glitch) */
+  echoes: { t: number; x: number; y: number; aim: number; item: ItemKind; from: 'player' | 'red'; owner: number }[];
   combo: { count: number; timer: number };
   /** game seconds left on a Survive goal */
   surviveLeft: number;

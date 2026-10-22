@@ -5,7 +5,8 @@
 export type SfxName =
   | 'shot' | 'shotgun' | 'redShot' | 'punch' | 'whiff' | 'shatter' | 'glass' | 'coin' | 'pickup' | 'throw'
   | 'parry' | 'tell' | 'death' | 'clear' | 'shield' | 'dash' | 'rewind' | 'hover' | 'click' | 'door'
-  | 'wave' | 'deflect' | 'break' | 'phase' | 'star' | 'tick' | 'buy' | 'deny' | 'stun';
+  | 'wave' | 'deflect' | 'break' | 'phase' | 'star' | 'tick' | 'buy' | 'deny' | 'stun'
+  | 'smg' | 'rifle' | 'slash' | 'reflect' | 'split' | 'fall' | 'warn' | 'train' | 'land' | 'beat' | 'drop';
 
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -251,6 +252,49 @@ export class Sound {
         break;
       case 'stun':
         this.tone('triangle', 900 * r, 1300 * r, 0.08 * d, 0.06 * vol);
+        break;
+      case 'smg':
+        this.noiseBurst(0.05 * d, 0.35 * vol, 2200 * r, 'highpass');
+        this.tone('square', 220 * r, 70, 0.05 * d, 0.22 * vol);
+        break;
+      case 'rifle':
+        this.noiseBurst(0.22 * d, 0.6 * vol, 1400 * r, 'highpass');
+        this.tone('sawtooth', 160 * r, 30, 0.25 * d, 0.4 * vol);
+        this.tone('sine', 2600 * r, 900 * r, 0.3 * d, 0.06 * vol, undefined, 0.02 * d);
+        break;
+      case 'slash':
+        this.noiseBurst(0.12 * d, 0.3 * vol, 3200 * r, 'bandpass', undefined, 0, 4);
+        this.tone('sine', 1800 * r, 2600 * r, 0.1 * d, 0.05 * vol);
+        break;
+      case 'reflect':
+        this.tone('sine', 3200 * r, 1600 * r, 0.18 * d, 0.14 * vol);
+        this.tone('square', 1600 * r, 3200 * r, 0.08 * d, 0.05 * vol);
+        break;
+      case 'split':
+        this.noiseBurst(0.15 * d, 0.3 * vol, 3500 * r, 'highpass');
+        this.tone('sine', 700 * r, 1400 * r, 0.12 * d, 0.1 * vol);
+        break;
+      case 'fall':
+        this.tone('sine', 900 * r, 120 * r, 0.6 * d, 0.12 * vol);
+        break;
+      case 'warn':
+        this.tone('square', 880 * r, 880 * r, 0.09 * d, 0.07 * vol);
+        this.tone('square', 660 * r, 660 * r, 0.09 * d, 0.07 * vol, undefined, 0.14 * d);
+        break;
+      case 'train':
+        this.noiseBurst(0.9 * d, 0.45 * vol, 400 * r, 'lowpass');
+        this.tone('sawtooth', 70 * r, 55 * r, 0.9 * d, 0.2 * vol);
+        break;
+      case 'land':
+        this.tone('sine', 110 * r, 30, 0.4 * d, 0.8 * vol);
+        this.noiseBurst(0.3 * d, 0.4 * vol, 600 * r, 'lowpass');
+        break;
+      case 'beat':
+        this.tone('sine', 120 * r, 45, 0.12 * d, 0.3 * vol);
+        break;
+      case 'drop':
+        this.tone('sawtooth', 60 * r, 35, 0.5 * d, 0.4 * vol);
+        this.noiseBurst(0.25 * d, 0.35 * vol, 900 * r, 'lowpass');
         break;
     }
   }
