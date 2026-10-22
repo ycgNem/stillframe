@@ -1,0 +1,25 @@
+{
+  "name": "stillframe",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Pixel-art top-down SUPERHOT-style browser game: time moves when you move. Levels, coins and upgrades.",
+  "author": "jacksonwalley",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "playwright": "^1.48.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}

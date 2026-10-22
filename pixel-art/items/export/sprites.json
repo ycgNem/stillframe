@@ -1,0 +1,186 @@
+{
+ "sprites": [
+  {
+   "name": "held_pistol",
+   "file": "held_pistol.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_pistol",
+   "file": "item_pistol.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "held_shotgun",
+   "file": "held_shotgun.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_shotgun",
+   "file": "item_shotgun.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "held_bottle",
+   "file": "held_bottle.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_bottle",
+   "file": "item_bottle.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "held_mug",
+   "file": "held_mug.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_mug",
+   "file": "item_mug.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "held_keyboard",
+   "file": "held_keyboard.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_keyboard",
+   "file": "item_keyboard.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "held_ashtray",
+   "file": "held_ashtray.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 16,
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  {
+   "name": "item_ashtray",
+   "file": "item_ashtray.png",
+   "frame": [
+    20,
+    20
+   ],
+   "frames": 1,
+   "pivot": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "thrown_desk",
+   "file": "thrown_desk.png",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 4,
+   "pivot": [
+    12,
+    14
+   ]
+  },
+  {
+   "name": "coin",
+   "file": "coin.png",
+   "frame": [
+    7,
+    7
+   ],
+   "frames": 4,
+   "pivot": [
+    3,
+    3
+   ]
+  }
+ ]
+}

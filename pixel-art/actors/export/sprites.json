@@ -1,0 +1,329 @@
+{
+ "sprites": [
+  {
+   "name": "player_s",
+   "file": "player_s.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "player_se",
+   "file": "player_se.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "player_e",
+   "file": "player_e.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "player_ne",
+   "file": "player_ne.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "player_n",
+   "file": "player_n.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "grunt_s",
+   "file": "grunt_s.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "grunt_se",
+   "file": "grunt_se.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "grunt_e",
+   "file": "grunt_e.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "grunt_ne",
+   "file": "grunt_ne.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "grunt_n",
+   "file": "grunt_n.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "gunner_s",
+   "file": "gunner_s.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "gunner_se",
+   "file": "gunner_se.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "gunner_e",
+   "file": "gunner_e.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "gunner_ne",
+   "file": "gunner_ne.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "gunner_n",
+   "file": "gunner_n.png",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "pivot": [
+    16,
+    29
+   ]
+  },
+  {
+   "name": "brute_s",
+   "file": "brute_s.png",
+   "frame": [
+    40,
+    40
+   ],
+   "frames": 7,
+   "pivot": [
+    20,
+    37
+   ]
+  },
+  {
+   "name": "brute_se",
+   "file": "brute_se.png",
+   "frame": [
+    40,
+    40
+   ],
+   "frames": 7,
+   "pivot": [
+    20,
+    37
+   ]
+  },
+  {
+   "name": "brute_e",
+   "file": "brute_e.png",
+   "frame": [
+    40,
+    40
+   ],
+   "frames": 7,
+   "pivot": [
+    20,
+    37
+   ]
+  },
+  {
+   "name": "brute_ne",
+   "file": "brute_ne.png",
+   "frame": [
+    40,
+    40
+   ],
+   "frames": 7,
+   "pivot": [
+    20,
+    37
+   ]
+  },
+  {
+   "name": "brute_n",
+   "file": "brute_n.png",
+   "frame": [
+    40,
+    40
+   ],
+   "frames": 7,
+   "pivot": [
+    20,
+    37
+   ]
+  },
+  {
+   "name": "manager_s",
+   "file": "manager_s.png",
+   "frame": [
+    48,
+    48
+   ],
+   "frames": 7,
+   "pivot": [
+    24,
+    45
+   ]
+  },
+  {
+   "name": "manager_se",
+   "file": "manager_se.png",
+   "frame": [
+    48,
+    48
+   ],
+   "frames": 7,
+   "pivot": [
+    24,
+    45
+   ]
+  },
+  {
+   "name": "manager_e",
+   "file": "manager_e.png",
+   "frame": [
+    48,
+    48
+   ],
+   "frames": 7,
+   "pivot": [
+    24,
+    45
+   ]
+  },
+  {
+   "name": "manager_ne",
+   "file": "manager_ne.png",
+   "frame": [
+    48,
+    48
+   ],
+   "frames": 7,
+   "pivot": [
+    24,
+    45
+   ]
+  },
+  {
+   "name": "manager_n",
+   "file": "manager_n.png",
+   "frame": [
+    48,
+    48
+   ],
+   "frames": 7,
+   "pivot": [
+    24,
+    45
+   ]
+  }
+ ]
+}
