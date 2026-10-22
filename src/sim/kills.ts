@@ -12,6 +12,7 @@ export function disarm(w: World, r: Red, fx: number, fy: number, ev: SimEvent[])
   if (!r.held) return;
   const d = Math.hypot(fx - r.x, fy - r.y) || 1;
   const item = { id: w.nextId++, kind: r.held.kind, x: r.x, y: r.y, ammo: r.held.ammo, boosted: r.held.boosted };
+  r.grabCd = COMBAT.regrab;
   // nudge it out toward the player, but never into a wall
   const probe = { id: 0, x: r.x, y: r.y, px: 0, py: 0, r: 2, walked: 0 };
   moveBody(w, probe, ((fx - r.x) / d) * COMBAT.disarmDrop, ((fy - r.y) / d) * COMBAT.disarmDrop, 'player');
@@ -38,6 +39,8 @@ export function hurtRed(w: World, r: Red, damage: number, cause: KillCause, ev: 
     ev.push({ t: 'deflect', x: r.x, y: r.y });
     return;
   }
+  // its own side's stray shots and desks only chip the boss
+  if (r.kind === 'manager' && cause === 'friendly') damage = Math.min(damage, MANAGER.friendlyDamage);
   r.hp -= damage;
   r.hurt = 0.15;
   ev.push({ t: 'hit', x: r.x, y: r.y, id: r.id, aim: o.aim });
@@ -97,8 +100,9 @@ export function shatter(w: World, r: Red, cause: KillCause, ev: SimEvent[], o: H
   ev.push({ t: 'shatter', x: r.x, y: r.y, id: r.id, kind: r.kind, aim: o.aim, cause, coins: base + combo + style });
 }
 
-/** Something lethal reached the player. A shield takes it if there is one. Returns true if you died. */
-export function hurtPlayer(w: World, aim: number, ev: SimEvent[]): boolean {
+/** Something lethal reached the player (from red `by`, for the death screen). A shield takes it if there is
+ *  one. Returns true if you died. */
+export function hurtPlayer(w: World, aim: number, ev: SimEvent[], by = 0): boolean {
   const p = w.player;
   if (w.status !== 'play' || p.grace > 0) return false;
   if (p.shield > 0) {
@@ -117,7 +121,7 @@ export function hurtPlayer(w: World, aim: number, ev: SimEvent[]): boolean {
     return false;
   }
   w.status = 'dead';
-  ev.push({ t: 'death', x: p.x, y: p.y, aim });
+  ev.push({ t: 'death', x: p.x, y: p.y, aim, by });
   return true;
 }
 

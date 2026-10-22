@@ -36,7 +36,7 @@ export function makeRed(w: World, kind: RedKind, x: number, y: number, item: Ite
     kind, hp: def.hp, aim: Math.PI / 2, state: 'move', t: 0,
     held: held ? freshHeld(held) : null,
     cooldown: 0.6, stun: 0, stunByThrow: false, strafe: 1, strafeT: 1, cvx: 0, cvy: 0, hurt: 0, phase: 0,
-    chargeCd: 1.5, guard: 0, steady: 0, dead: false,
+    chargeCd: 1.5, guard: 0, steady: 0, grabCd: 0, dead: false,
   };
 }
 

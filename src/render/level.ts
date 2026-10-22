@@ -168,21 +168,30 @@ function drawGlass(ctx: Ctx, w: World, x: number, y: number, px: number, py: num
   const g = (t: number) => t === TILE_GLASS || wallish(t);
   const horizontal = g(at(w, x - 1, y)) || g(at(w, x + 1, y));
   const vertical = g(at(w, x, y - 1)) || g(at(w, x, y + 1));
+  // diagonal glare streaks, shifted per tile so a long wall of glass doesn't repeat
+  const o = (x * 5 + y * 3) % 7;
   if (horizontal || !vertical) {
-    // a pane running east-west: its top edge, then its see-through face
-    rect(ctx, px, py + 3, TILE, 1, PAL.stone);
-    for (let j = 4; j < 15; j++) for (let i = (j & 1); i < TILE; i += 2) rect(ctx, px + i, py + j, 1, 1, j < 6 ? PAL.paper : PAL.fog);
-    rect(ctx, px, py + 15, TILE, 1, PAL.stone);
-    rect(ctx, px + 3, py + 6, 1, 1, PAL.paper);
-    rect(ctx, px + 4, py + 5, 1, 1, PAL.paper);
+    // a pane running east-west: a dark frame top and bottom, a pale face, two streaks of glare
+    rect(ctx, px, py + 2, TILE, 1, PAL.ash);
+    rect(ctx, px, py + 3, TILE, 11, PAL.fog);
+    dither(ctx, px, py + 11, TILE, 3, PAL.stone);
+    for (let k = 0; k < 7; k++) {
+      const gx = px + ((o + k) % TILE), gy = py + 12 - k;
+      if (gx >= px + 2) rect(ctx, gx, gy, 1, 1, PAL.paper);
+      const hx = px + ((o + k + 4) % TILE);
+      if (k < 5 && hx >= px + 2) rect(ctx, hx, gy, 1, 1, PAL.paper);
+    }
+    rect(ctx, px, py + 14, TILE, 1, PAL.ash);
+    rect(ctx, px, py + 3, TILE, 1, PAL.paper);
   }
   if (vertical) {
-    // a pane running north-south: a thin wall of glass
-    rect(ctx, px + 6, py - 6, 4, TILE + 6, PAL.fog);
-    rect(ctx, px + 6, py - 6, 1, TILE + 6, PAL.stone);
-    rect(ctx, px + 9, py - 6, 1, TILE + 6, PAL.ash);
-    rect(ctx, px + 7, py - 4, 1, 3, PAL.paper);
-    if (!g(at(w, x, y - 1))) rect(ctx, px + 6, py - 6, 4, 1, PAL.paper);
+    // a pane running north-south, seen edge-on in ¾: a slab with a lit top, framed dark on both sides
+    rect(ctx, px + 5, py - 6, 6, TILE + 6, PAL.fog);
+    rect(ctx, px + 5, py - 6, 1, TILE + 6, PAL.ash);
+    rect(ctx, px + 10, py - 6, 1, TILE + 6, PAL.ash);
+    dither(ctx, px + 8, py - 6, 2, TILE + 6, PAL.stone);
+    for (let k = 0; k < 4; k++) rect(ctx, px + 6 + (k >> 1), py - 2 + o + k * 2, 1, 2, PAL.paper);
+    if (!g(at(w, x, y - 1))) rect(ctx, px + 5, py - 6, 6, 1, PAL.paper);
   }
 }
 

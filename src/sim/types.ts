@@ -75,6 +75,8 @@ export interface Red extends Body {
   guard: number;
   /** game seconds it shrugs off throw stuns (brutes and the Manager, after one), so throws can't stun-lock it */
   steady: number;
+  /** game seconds until it may pick something up again (just disarmed) */
+  grabCd: number;
   dead: boolean;
 }
 
@@ -87,6 +89,8 @@ export interface Bullet {
   vx: number;
   vy: number;
   from: 'player' | 'red';
+  /** id of whoever fired it */
+  owner: number;
   /** px it may still travel */
   life: number;
   damage: number;
@@ -171,7 +175,7 @@ export type SimEvent =
   | { t: 'spawn'; x: number; y: number; door: number }
   | { t: 'phase'; n: number }
   | { t: 'empty'; x: number; y: number }
-  | { t: 'death'; x: number; y: number; aim: number }
+  | { t: 'death'; x: number; y: number; aim: number; by: number }
   | { t: 'clear'; x: number; y: number };
 
 /** What the player bought, as the sim sees it. Tiers are 0 (not bought) to 3. */

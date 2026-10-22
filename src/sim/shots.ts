@@ -50,7 +50,7 @@ export function stepBullets(w: World, ev: SimEvent[]) {
       if (b.from === 'red' && Math.hypot(p.x - b.x, p.y - b.y) < p.r + COMBAT.bulletRadius) {
         b.life = 0;
         b.hit = true;
-        hurtPlayer(w, Math.atan2(b.vy, b.vx), ev);
+        hurtPlayer(w, Math.atan2(b.vy, b.vx), ev, b.owner);
         break;
       }
     }
@@ -89,12 +89,13 @@ export function segDist(ax: number, ay: number, bx: number, by: number, cx: numb
   return Math.hypot(rx0 + rvx * t, ry0 + rvy * t);
 }
 
-/** Bullet meets bullet: both vanish. */
+/** Your bullet meets a red bullet that was already flying when you fired: both vanish. Two shots
+ *  traded at the same moment pass each other (ids rise as things are made, so a lower id is older). */
 function parries(w: World, ev: SimEvent[]) {
   for (const a of w.bullets) {
     if (a.from !== 'player' || a.hit) continue;
     for (const b of w.bullets) {
-      if (b.from !== 'red' || b.hit) continue;
+      if (b.from !== 'red' || b.hit || b.id > a.id) continue;
       if (segDist(a.px, a.py, a.x, a.y, b.px, b.py, b.x, b.y) > COMBAT.parryRadius) continue;
       a.life = b.life = 0;
       a.hit = b.hit = true;
@@ -152,7 +153,7 @@ export function stepThrown(w: World, ev: SimEvent[]) {
         }
       } else {
         if (Math.hypot(p.x - t.x, p.y - t.y) < p.r + t.r) {
-          hurtPlayer(w, Math.atan2(t.vy, t.vx), ev);
+          hurtPlayer(w, Math.atan2(t.vy, t.vx), ev, t.owner);
           land(w, t, ev, true);
           break;
         }

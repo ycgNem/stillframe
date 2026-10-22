@@ -36,7 +36,7 @@ describe('time rule', () => {
   });
 
   it('Stride slows walking time and Trigger shortens the burst', () => {
-    expect(run(createTime(3, 0), 1, 120).scale).toBeCloseTo(TIER_VALUES.strideWalk[3], 4);
+    expect(run(createTime(3, 0), 1, 120).scale).toBeCloseTo(1 / TIER_VALUES.strideSpeed[3], 4);
     const t = createTime(0, 2);
     startBurst(t);
     expect(t.burst).toBeCloseTo(TIER_VALUES.triggerBurst[2], 6);

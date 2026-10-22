@@ -16,8 +16,8 @@ export interface TrackDef {
 export const TIER_PRICES = [40, 100, 200] as const;
 
 export const TRACKS: TrackDef[] = [
-  { id: 'stride', name: 'STRIDE', blurb: 'WALKING RUNS TIME SLOWER', tiers: ['WALK AT 85% TIME', 'WALK AT 72% TIME', 'WALK AT 60% TIME'] },
-  { id: 'trigger', name: 'TRIGGER', blurb: 'SHORTER ACTION BURSTS', tiers: ['BURST 0.14 S', 'BURST 0.10 S', 'BURST 0.06 S'] },
+  { id: 'stride', name: 'STRIDE', blurb: 'YOU OUTPACE TIME', tiers: ['YOU MOVE 15% FASTER THAN IT', 'YOU MOVE 30% FASTER THAN IT', 'YOU MOVE 45% FASTER THAN IT'] },
+  { id: 'trigger', name: 'TRIGGER', blurb: 'SHORTER ACTION BURSTS', tiers: ['BURST 0.10 S', 'BURST 0.04 S', 'BURST 0.02 S'] },
   { id: 'shield', name: 'SHIELD', blurb: 'SURVIVE A HIT', tiers: ['1 FREE HIT PER LEVEL', 'ITS BREAK STUNS REDS NEARBY', '2 FREE HITS'] },
   { id: 'frameskip', name: 'FRAMESKIP', blurb: 'SPACE: DASH IN ZERO TIME', tiers: ['3 TILES, 4 S COOLDOWN', '4 TILES, 2.5 S COOLDOWN', 'DASHING THROUGH REDS SHATTERS THEM'] },
   { id: 'rewind', name: 'REWIND', blurb: 'DIE, JUMP BACK 2 SECONDS', tiers: ['1 CHARGE PER LEVEL', '2 CHARGES', 'CHARGES REFILL EACH WAVE'] },
@@ -28,8 +28,10 @@ export const TRACKS: TrackDef[] = [
 
 /** Per-tier values the sim and the time rule read. Index 0 = not bought. */
 export const TIER_VALUES = {
-  strideWalk: [1, 0.85, 0.72, 0.6],
-  triggerBurst: [0.18, 0.14, 0.1, 0.06],
+  /** your walking speed against game time; the time rule divides the walking scale by the same, so you
+   *  cross the room as fast as ever in real time while the world slows around you */
+  strideSpeed: [1, 1.15, 1.3, 1.45],
+  triggerBurst: [0.18, 0.1, 0.04, 0.02],
   shieldHits: [0, 1, 1, 2],
   rewindCharges: [0, 1, 2, 2],
   armSpeed: [1, 1.25, 1.25, 1.25],

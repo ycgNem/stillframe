@@ -35,8 +35,9 @@ export class TallyScreen implements Screen {
     const ctx = this.app.display.ctx, ui = this.app.ui, r = this.result, def = this.play.def;
     this.t += realDt;
     this.app.sound.update(realDt, 0.3);
-    // skip the count-up with a click or key
-    if (this.t > 0.2 && this.shown < r.lines.length + 3 && (this.app.input.pressed('Mouse0') || this.app.input.pressed('Space'))) this.t = 99;
+    // skip the count-up with a click or Space; once it has played out, clicks belong to the buttons
+    const counting = this.t < r.lines.length * LINE_TIME + 1.1;
+    if (this.t > 0.2 && counting && (this.app.input.pressed('Mouse0') || this.app.input.pressed('Space'))) this.t = 99;
     rect(ctx, 0, 0, VIEW.w, VIEW.h, PAL.paper);
     for (let x = 0; x < VIEW.w; x += 16) rect(ctx, x, 0, 1, VIEW.h, PAL.fog);
     for (let y = 0; y < VIEW.h; y += 16) rect(ctx, 0, y, VIEW.w, 1, PAL.fog);
@@ -90,12 +91,12 @@ export class TallyScreen implements Screen {
     if (r.best) drawText(ctx, 'NEW BEST TIME', x0, VIEW.h - 36, PAL.cyan);
     const next = nextLevel(def.id);
     const by = VIEW.h - 26;
-    if (ui.button('next', 214, by, 90, 16, next ? 'NEXT LEVEL' : 'FINALE', { primary: true, key: 'Enter' })) {
+    if (ui.button('next', 214, by, 90, 16, next ? 'NEXT  ENTER' : 'FINALE  ENTER', { primary: true, key: 'Enter' })) {
       this.app.goto(next ? new PlayScreen(this.app, next.id) : new EndScreen(this.app));
     }
-    if (ui.button('retry', 150, by, 58, 16, 'RETRY', { key: 'KeyR' })) this.app.goto(new PlayScreen(this.app, def.id, true));
-    if (ui.button('shop', 70, by, 74, 16, 'WORKSHOP', { key: 'KeyW' })) this.app.goto(new WorkshopScreen(this.app, def.id));
-    if (ui.button('map', 16, by, 48, 16, 'MAP', { key: 'Escape' })) this.app.goto(new MapScreen(this.app, def.id));
+    if (ui.button('retry', 150, by, 58, 16, 'RETRY  R', { key: 'KeyR' })) this.app.goto(new PlayScreen(this.app, def.id, true));
+    if (ui.button('shop', 70, by, 74, 16, 'WORKSHOP  W', { key: 'KeyW' })) this.app.goto(new WorkshopScreen(this.app, def.id));
+    if (ui.button('map', 16, by, 48, 16, 'MAP  ESC', { key: 'Escape' })) this.app.goto(new MapScreen(this.app, def.id));
     const bank = `BANK ${this.app.save.coins}`;
     drawText(ctx, bank, VIEW.w - textWidth(bank) - 16, VIEW.h - 36, PAL.amber);
     ui.end();

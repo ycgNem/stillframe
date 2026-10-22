@@ -1,7 +1,7 @@
 // The time rule (GAME_DESIGN §4): game time crawls while you stand still, runs while you move, and an
 // action (shot, punch, throw, pickup) buys a short burst at full speed. It decides how many sim ticks run
 // per real second; the sim never sees the scale, so a replay can play the same ticks back at real speed.
-// Stride lowers the walking scale and Trigger shortens the burst.
+// Stride lowers the walking scale (while the sim speeds you up by as much) and Trigger shortens the burst.
 import { TIME } from '../data/tuning';
 import { TIER_VALUES } from '../data/upgrades';
 
@@ -16,7 +16,7 @@ export interface TimeState {
 }
 
 export function createTime(stride = 0, trigger = 0): TimeState {
-  return { scale: TIME.idle, burst: 0, walk: TIME.walk * TIER_VALUES.strideWalk[stride], burstLen: TIER_VALUES.triggerBurst[trigger] };
+  return { scale: TIME.idle, burst: 0, walk: TIME.walk / TIER_VALUES.strideSpeed[stride], burstLen: TIER_VALUES.triggerBurst[trigger] };
 }
 
 /** Once per real frame. `move` is how hard the player is moving, 0..1. Returns the new scale. */

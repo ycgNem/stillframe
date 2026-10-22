@@ -22,6 +22,7 @@ export function stepReds(w: World, ev: SimEvent[]) {
     r.chargeCd = Math.max(0, r.chargeCd - DT);
     r.guard = Math.max(0, r.guard - DT);
     r.steady = Math.max(0, r.steady - DT);
+    r.grabCd = Math.max(0, r.grabCd - DT);
     if (r.stun > 0) {
       r.stun = Math.max(0, r.stun - DT);
       if (r.stun === 0) r.stunByThrow = false;
@@ -48,14 +49,18 @@ function think(w: World, r: Red, ev: SimEvent[]) {
       if (r.t > 0) return;
       const hit = dist - p.r - r.r <= def.punchReach && angleDiff(toP, r.aim) <= 0.95;
       ev.push({ t: 'punch', x: r.x + Math.cos(r.aim) * 8, y: r.y + Math.sin(r.aim) * 8, aim: r.aim, hit, from: 'red' });
-      if (hit) hurtPlayer(w, r.aim, ev);
+      if (hit) hurtPlayer(w, r.aim, ev, r.id);
       r.state = 'recover';
       r.t = def.recover;
       return;
     }
     case 'aim': {
       r.t -= DT;
-      if (r.t > def.aimLock) r.aim = toP;
+      if (r.t > def.aimLock) {
+        r.aim = toP;
+        // a gunner keeps edging sideways while its line is dotted, so you have to lead it
+        if (def.aimStrafe > 0) strafe(w, r, toP, def.speed * def.aimStrafe);
+      }
       if (r.t > 0) return;
       fire(w, r, ev);
       r.state = 'recover';
@@ -145,13 +150,8 @@ function decide(w: World, r: Red, dist: number, toP: number, ev: SimEvent[]) {
     if (!clear || dist > def.keepMax) dir = seek(w, r, see);
     else if (dist < def.keepMin) dir = { x: -Math.cos(toP), y: -Math.sin(toP) };
     else {
-      dir = { x: -Math.sin(toP) * r.strafe, y: Math.cos(toP) * r.strafe };
-      speed *= 0.8;
-    }
-    r.strafeT -= DT;
-    if (r.strafeT <= 0) {
-      r.strafe = -r.strafe;
-      r.strafeT = randRange(w, 0.8, 1.8);
+      strafe(w, r, toP, speed * 0.8);
+      dir = null;
     }
   } else if (loaded) {
     // an armed grunt closes in, then edges sideways while it waits to fire
@@ -161,18 +161,25 @@ function decide(w: World, r: Red, dist: number, toP: number, ev: SimEvent[]) {
       speed *= 0.5;
     }
   } else {
-    const loot = !held && def.scavenge > 0 ? nearbyGun(w, r, Math.min(def.scavenge, dist)) : null;
+    const loot = !held && def.scavenge > 0 && r.grabCd <= 0 ? nearbyGun(w, r, Math.min(def.scavenge, dist)) : null;
     if (loot) {
       const d = Math.hypot(loot.x - r.x, loot.y - r.y) || 1;
       dir = { x: (loot.x - r.x) / d, y: (loot.y - r.y) / d };
     } else dir = seek(w, r, see);
   }
-  if (dir) {
-    const moved = walkBy(w, r, dir.x * speed * DT, dir.y * speed * DT);
-    if (!moved && loaded && r.kind === 'gunner') r.strafe = -r.strafe;
-  }
+  if (dir) walkBy(w, r, dir.x * speed * DT, dir.y * speed * DT);
   r.aim = see ? toP : dir ? Math.atan2(dir.y, dir.x) : r.aim;
   scavenge(w, r, ev);
+}
+
+/** Sideways to you, turning back at walls and every second or so. */
+function strafe(w: World, r: Red, toP: number, speed: number) {
+  const moved = walkBy(w, r, -Math.sin(toP) * r.strafe * speed * DT, Math.cos(toP) * r.strafe * speed * DT);
+  r.strafeT -= DT;
+  if (!moved || r.strafeT <= 0) {
+    r.strafe = -r.strafe;
+    r.strafeT = randRange(w, 0.8, 1.8);
+  }
 }
 
 /** Toward the player: straight if the way is open, else down the flow field. */
@@ -201,7 +208,7 @@ function nearbyGun(w: World, r: Red, within: number) {
 
 /** Reds pick up whatever they walk over, if their hands are free. */
 function scavenge(w: World, r: Red, ev: SimEvent[]) {
-  if (r.held || r.kind === 'brute' || r.kind === 'manager') return;
+  if (r.held || r.grabCd > 0 || r.kind === 'brute' || r.kind === 'manager') return;
   const i = w.items.findIndex((it) => Math.hypot(it.x - r.x, it.y - r.y) < r.r + 4);
   if (i < 0) return;
   const it = w.items[i];
@@ -230,7 +237,7 @@ function fire(w: World, r: Red, ev: SimEvent[]) {
     const spread = def.pellets > 1 ? (i / (def.pellets - 1) - 0.5) * def.spread : 0;
     const a = r.aim + spread + randRange(w, -COMBAT.redSpread, COMBAT.redSpread);
     const x = r.x + Math.cos(a) * (r.r + 3), y = r.y + Math.sin(a) * (r.r + 3);
-    w.bullets.push({ id: w.nextId++, x, y, px: x, py: y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, from: 'red', life: def.range, damage: def.damage, hit: false });
+    w.bullets.push({ id: w.nextId++, x, y, px: x, py: y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, from: 'red', owner: r.id, life: def.range, damage: def.damage, hit: false });
   }
   ev.push({ t: 'shot', x: r.x + Math.cos(r.aim) * (r.r + 3), y: r.y + Math.sin(r.aim) * (r.r + 3), aim: r.aim, item: h.kind, from: 'red' });
 }
@@ -263,7 +270,7 @@ function charge(w: World, r: Red, ev: SimEvent[]) {
     if (o === r || o.dead || Math.hypot(o.x - r.x, o.y - r.y) > o.r + r.r) continue;
     shatter(w, o, 'charge', ev, { aim: Math.atan2(r.cvy, r.cvx) });
   }
-  if (Math.hypot(p.x - r.x, p.y - r.y) < p.r + r.r + 1) hurtPlayer(w, Math.atan2(r.cvy, r.cvx), ev);
+  if (Math.hypot(p.x - r.x, p.y - r.y) < p.r + r.r + 1) hurtPlayer(w, Math.atan2(r.cvy, r.cvx), ev, r.id);
   r.t -= DT;
   if (Math.hypot(r.x - x0, r.y - y0) < want * 0.5) {
     // into a wall: dazed, and wide open

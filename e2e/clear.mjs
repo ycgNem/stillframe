@@ -21,7 +21,7 @@ await page.goto(base);
 await page.waitForTimeout(800);
 await page.evaluate((id) => { localStorage.clear(); const a = window.__app; a.autoplay = true; a.startLevel(id); }, level);
 let shotMid = false;
-for (let i = 0; i < 600 && (await screen()) === 'play'; i++) {
+for (let i = 0; i < 1400 && (await screen()) === 'play'; i++) {
   await page.waitForTimeout(250);
   const k = await page.evaluate(() => window.__app.screen.world?.stats.kills ?? 0);
   if (!shotMid && k >= 1) {
@@ -38,6 +38,7 @@ if ((await screen()) === 'replay') {
   await page.waitForTimeout(700);
   await shot('2-replay');
 }
+if ((await screen()) === 'play') console.log('still playing at tick', await page.evaluate(() => window.__app.screen.world.tick));
 for (let i = 0; i < 200 && (await screen()) === 'replay'; i++) await page.waitForTimeout(200);
 await page.waitForTimeout(3500);
 await shot('3-tally');

@@ -5,7 +5,7 @@ import { TIER_VALUES } from '../data/upgrades';
 import { boxBlocked, moveBody } from './grid';
 import { disarm, hurtRed } from './kills';
 import { randRange } from './rng';
-import type { Held, Item, Red, SimEvent, TickInput, World } from './types';
+import type { Held, Item, Player, Red, SimEvent, TickInput, World } from './types';
 
 const DT = 1 / TICK_RATE;
 
@@ -65,8 +65,9 @@ export function stepPlayer(w: World, input: TickInput, ev: SimEvent[]) {
 function walk(w: World, input: TickInput) {
   const p = w.player;
   const len = Math.hypot(input.mx, input.my);
-  const tx = len > 0 ? (input.mx / Math.max(1, len)) * PLAYER.speed : 0;
-  const ty = len > 0 ? (input.my / Math.max(1, len)) * PLAYER.speed : 0;
+  const speed = PLAYER.speed * TIER_VALUES.strideSpeed[w.mods.stride];
+  const tx = len > 0 ? (input.mx / Math.max(1, len)) * speed : 0;
+  const ty = len > 0 ? (input.my / Math.max(1, len)) * speed : 0;
   const dvx = tx - p.vx, dvy = ty - p.vy;
   const dv = Math.hypot(dvx, dvy);
   const maxDv = (len > 0 ? PLAYER.accel : PLAYER.decel) * DT;
@@ -82,7 +83,22 @@ function walk(w: World, input: TickInput) {
   const b = moveBody(w, p, p.vx * DT, p.vy * DT, 'player');
   if (b.bx) p.vx = 0;
   if (b.by) p.vy = 0;
+  if (b.bx && !input.my && tx) cornerSlide(w, p, Math.sign(tx), 0);
+  if (b.by && !input.mx && ty) cornerSlide(w, p, 0, Math.sign(ty));
   p.walked += Math.hypot(p.x - x0, p.y - y0);
+}
+
+/** Walking straight into a corner you only brush: step round it, up to `cornerSlide` px to the side. */
+function cornerSlide(w: World, p: Player, dx: number, dy: number) {
+  const most = PLAYER.speed * DT;
+  for (let off = 1; off <= PLAYER.cornerSlide; off++) {
+    for (const s of [-1, 1]) {
+      const ox = dx ? 0 : s * off, oy = dx ? s * off : 0;
+      if (boxBlocked(w, p.x + ox, p.y + oy, p.r, 'player') || boxBlocked(w, p.x + ox + dx, p.y + oy + dy, p.r, 'player')) continue;
+      moveBody(w, p, Math.sign(ox) * Math.min(off, most), Math.sign(oy) * Math.min(off, most), 'player');
+      return;
+    }
+  }
 }
 
 /** Frameskip: an instant line move toward the aim, stopped by walls, in zero game time. */
@@ -140,7 +156,7 @@ function shoot(w: World, h: Held, ev: SimEvent[]) {
     const x = p.x + dx * (p.r + 3), y = p.y + dy * (p.r + 3);
     w.bullets.push({
       id: w.nextId++, x, y, px: x, py: y, vx: dx * def.speed, vy: dy * def.speed,
-      from: 'player', life: def.range, damage: def.damage, hit: false,
+      from: 'player', owner: p.id, life: def.range, damage: def.damage, hit: false,
     });
   }
   ev.push({ t: 'shot', x: p.x + Math.cos(p.aim) * (p.r + 3), y: p.y + Math.sin(p.aim) * (p.r + 3), aim: p.aim, item: h.kind, from: 'player' });
@@ -152,15 +168,7 @@ function punch(w: World, ev: SimEvent[]) {
   p.act = 'punch';
   p.actT = 0;
   w.stats.punches++;
-  let target: Red | null = null, bestD = Infinity;
-  for (const r of w.reds) {
-    if (r.dead) continue;
-    const d = Math.hypot(r.x - p.x, r.y - p.y);
-    if (d - r.r - p.r > PLAYER.punchReach || d >= bestD) continue;
-    if (d > r.r + p.r && angleDiff(Math.atan2(r.y - p.y, r.x - p.x), p.aim) > PLAYER.punchArc / 2) continue;
-    target = r;
-    bestD = d;
-  }
+  const target = punchTarget(w, p.aim);
   const fx = p.x + Math.cos(p.aim) * (p.r + 6), fy = p.y + Math.sin(p.aim) * (p.r + 6);
   ev.push({ t: 'punch', x: target ? (p.x + target.x) / 2 : fx, y: target ? (p.y + target.y) / 2 : fy, aim: p.aim, hit: !!target, from: 'player' });
   if (!target) return;
@@ -173,6 +181,24 @@ function punch(w: World, ev: SimEvent[]) {
   }
   moveBody(w, target, Math.cos(a) * PLAYER.punchKnock, Math.sin(a) * PLAYER.punchKnock, 'red');
   hurtRed(w, target, PLAYER.punchDamage, 'punch', ev, { aim: a });
+}
+
+/** Who a punch thrown now would hit: of the reds in reach and in the cone, the one closest to where you
+ *  aim (not just the nearest). The app asks too, to light the crosshair. */
+export function punchTarget(w: World, aim: number): Red | null {
+  const p = w.player;
+  let target: Red | null = null, bestA = Infinity;
+  for (const r of w.reds) {
+    if (r.dead) continue;
+    const d = Math.hypot(r.x - p.x, r.y - p.y);
+    if (d - r.r - p.r > PLAYER.punchReach) continue;
+    const a = angleDiff(Math.atan2(r.y - p.y, r.x - p.x), aim);
+    if (d > r.r + p.r && a > PLAYER.punchArc / 2) continue;
+    if (a >= bestA) continue;
+    target = r;
+    bestA = a;
+  }
+  return target;
 }
 
 function throwHeld(w: World, ev: SimEvent[]) {

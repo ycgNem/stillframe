@@ -60,7 +60,7 @@ export class ReplayScreen implements Screen {
   tick() {
     if (this.i >= this.play.rec.length) return;
     const events = step(this.world, this.play.rec[this.i++]);
-    this.fx.tick(1 / TICK_RATE);
+    this.fx.tick(1 / TICK_RATE, this.world);
     for (const e of events) {
       playEvent(this.app.sound, e, 'replay');
       this.fx.event(e, this.world);
@@ -92,14 +92,13 @@ export class ReplayScreen implements Screen {
       this.word = word;
       this.app.sound.chant(word % 2 ? 'FRAME' : 'STILL');
     }
+    // the words sit at the edges, outlined, so the replay itself stays in view: STILL. up top, FRAME. below
     const label = word % 2 ? 'FRAME.' : 'STILL.';
     const k = (this.t % WORD_TIME) / WORD_TIME;
     if (k < 0.75) {
-      rect(ctx, 0, 60, VIEW.w, 46, PAL.paper);
-      rect(ctx, 0, 60, VIEW.w, 1, PAL.fog);
-      rect(ctx, 0, 105, VIEW.w, 1, PAL.fog);
-      centerBig(ctx, label, VIEW.w / 2 + 2, 66, PAL.ash, 5);
-      centerBig(ctx, label, VIEW.w / 2, 64, PAL.ink, 5);
+      const y = word % 2 ? VIEW.h - 38 : 8;
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [2, 2]]) centerBig(ctx, label, VIEW.w / 2 + dx, y + dy, PAL.ink, 3);
+      centerBig(ctx, label, VIEW.w / 2, y, PAL.paper, 3);
     }
     rect(ctx, 0, VIEW.h - 10, VIEW.w, 10, PAL.ink);
     centerText(ctx, `HOLD SPACE: X2   ANY KEY: SKIP   ${(this.i / TICK_RATE).toFixed(1)} S`, VIEW.w / 2, VIEW.h - 8, PAL.slate);

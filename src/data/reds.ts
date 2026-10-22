@@ -27,6 +27,8 @@ export interface RedDef {
   /** a gunner keeps between these distances and strafes */
   keepMin: number;
   keepMax: number;
+  /** share of its speed it keeps strafing at while its aim line is still dotted (0 = stands still) */
+  aimStrafe: number;
   /** goes for a gun on the floor within this distance when unarmed (0 = never) */
   scavenge: number;
 }
@@ -35,12 +37,12 @@ const BASE: RedDef = {
   name: 'GRUNT', hp: 3, speed: 30, radius: 4.5, item: null,
   punchStart: 6, punchReach: 10, windup: 0.5, recover: 0.4,
   aimTell: 0.55, aimLock: 0.15, fireCooldown: 1.2, throwTell: 0.4, fireRange: 150,
-  keepMin: 0, keepMax: 0, scavenge: 64,
+  keepMin: 0, keepMax: 0, aimStrafe: 0, scavenge: 64,
 };
 
 export const REDS: Record<RedKind, RedDef> = {
   grunt: BASE,
-  gunner: { ...BASE, name: 'GUNNER', speed: 26, item: 'pistol', keepMin: 64, keepMax: 112, scavenge: 96 },
+  gunner: { ...BASE, name: 'GUNNER', speed: 26, item: 'pistol', keepMin: 80, keepMax: 128, aimStrafe: 0.6, scavenge: 96 },
   brute: { ...BASE, name: 'BRUTE', hp: 9, speed: 20, radius: 6.5, punchStart: 7, punchReach: 12, windup: 0.6, recover: 0.5, scavenge: 0 },
   manager: { ...BASE, name: 'THE MANAGER', hp: 18, speed: 22, radius: 7.5, punchStart: 7, punchReach: 12, windup: 0.55, recover: 0.45, scavenge: 0 },
 };
@@ -60,6 +62,8 @@ export const MANAGER = {
   chargeFrom: 1,
   /** as a phase begins it roars and shrugs off damage this long, while help comes through the doors */
   phaseGuard: 1.5,
+  /** a stray shot or desk from its own side only chips it, so you get the last word */
+  friendlyDamage: 1,
 };
 
 /** After a throw stuns a brute or the Manager, further throws only bounce off for this long. */

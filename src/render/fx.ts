@@ -3,7 +3,9 @@
 // rest (popups, the dash trail, coins flying to the counter) run on real time so the UI stays alive.
 // Nothing here touches the World.
 import { PAL } from '../data/palette';
+import { COINS } from '../data/tuning';
 import type { RedKind } from '../data/reds';
+import { stopsShots, TILE_PROP, tileOfPoint } from '../sim/grid';
 import type { SimEvent, World } from '../sim/types';
 import type { Atlas } from './atlas';
 import { actorSprite } from './actors';
@@ -21,7 +23,7 @@ interface Shard {
 }
 
 interface Spark {
-  kind: 'flash' | 'punch' | 'puff' | 'ring' | 'dust' | 'deflect';
+  kind: 'flash' | 'punch' | 'puff' | 'ring' | 'dust' | 'deflect' | 'impact';
   x: number; y: number;
   aim: number;
   t: number;
@@ -58,7 +60,9 @@ function jitter() {
   return seed / 0x7fffffff;
 }
 
-const MAX_SHARDS = 2400;
+const MAX_SHARDS = 4000;
+/** shards lower than this bounce off desks and copiers too, not just walls */
+const PROP_HEIGHT = 10;
 const GRAVITY = 420;
 
 export class Fx {
@@ -74,15 +78,21 @@ export class Fx {
 
   constructor(private atlas: Atlas) {}
 
-  /** One sim tick of game time. */
-  tick(dt: number) {
+  /** One sim tick of game time. With the world, shards bounce off walls instead of sailing into them. */
+  tick(dt: number, w?: World) {
     for (const s of this.shards) {
       s.px = s.x;
       s.py = s.y;
       s.pz = s.z;
       if (s.rest) continue;
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
+      const nx = s.x + s.vx * dt, ny = s.y + s.vy * dt;
+      if (w && this.solid(w, nx, ny, s.z)) {
+        if (this.solid(w, nx, s.y, s.z)) s.vx *= -0.35;
+        if (this.solid(w, s.x, ny, s.z)) s.vy *= -0.35;
+      } else {
+        s.x = nx;
+        s.y = ny;
+      }
       s.z += s.vz * dt;
       s.vz -= GRAVITY * dt;
       if (s.z <= 0) {
@@ -112,6 +122,11 @@ export class Fx {
     }
     for (const s of this.sparks) s.t += dt;
     this.sparks = this.sparks.filter((s) => s.t < s.life);
+  }
+
+  private solid(w: World, x: number, y: number, z: number) {
+    const t = tileOfPoint(w, x, y);
+    return stopsShots(t) && (t !== TILE_PROP || z < PROP_HEIGHT);
   }
 
   /** Real time passing (popups, trails, coins flying home). */
@@ -145,7 +160,9 @@ export class Fx {
         if (e.hit) this.sparks.push({ kind: 'punch', x: e.x, y: e.y, aim: e.aim, t: 0, life: 0.12, color: e.from === 'player' ? PAL.ink : PAL.hot });
         break;
       case 'wall':
-        this.sparks.push({ kind: 'dust', x: e.x, y: e.y, aim: 0, t: 0, life: 0.15, color: PAL.stone });
+        // where a shot or a charge stopped: big enough to see from across the room
+        this.sparks.push({ kind: 'impact', x: e.x, y: e.y, aim: 0, t: 0, life: 0.22, color: PAL.ink });
+        this.burst(e.x, e.y, AIR, 3, [PAL.iron, PAL.slate], 0, 40);
         break;
       case 'deflect':
         this.sparks.push({ kind: 'deflect', x: e.x, y: e.y, aim: 0, t: 0, life: 0.2, color: PAL.glint });
@@ -159,7 +176,7 @@ export class Fx {
         break;
       case 'parry':
         this.sparks.push({ kind: 'ring', x: e.x, y: e.y, aim: 0, t: 0, life: 0.25, color: PAL.ink });
-        this.popup('+3 PARRY', e.x, e.y - 16, PAL.ink);
+        this.popup(`+${COINS.parry} PARRY`, e.x, e.y - 16, PAL.ink);
         break;
       case 'shield':
         this.sparks.push({ kind: 'ring', x: e.x, y: e.y, aim: 0, t: 0, life: 0.35, color: PAL.cyan });
@@ -200,9 +217,9 @@ export class Fx {
     const px = this.atlas.has(sprite.name) ? this.atlas.pixels(sprite.name, 0) : null;
     const dx = Math.cos(aim), dy = Math.sin(aim);
     if (px) {
-      // every 2×2 block of opaque pixels becomes a shard, flying off with the blow
-      for (let j = 0; j < px.h; j += 2) {
-        for (let i = 0; i < px.w; i += 2) {
+      // every opaque pixel becomes a shard, flying off with the blow
+      for (let j = 0; j < px.h; j++) {
+        for (let i = 0; i < px.w; i++) {
           const k = (j * px.w + i) * 4;
           if (px.data[k + 3] < 128) continue;
           const c = `#${[px.data[k], px.data[k + 1], px.data[k + 2]].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
@@ -213,7 +230,7 @@ export class Fx {
           this.addShard({
             x: x + ox, y: y + (jitter() - 0.5) * 3, z: Math.max(0, z),
             vx: dx * sp + (ox / out) * 40 * jitter(), vy: dy * sp + (jitter() - 0.5) * 50,
-            vz: 30 + jitter() * 90 + (z - 10) * 2, c, s: jitter() < 0.3 ? 2 : 1,
+            vz: 30 + jitter() * 90 + (z - 10) * 2, c, s: jitter() < 0.12 ? 2 : 1,
           });
         }
       }
@@ -322,6 +339,14 @@ export class Fx {
           const a = (i / 8) * Math.PI * 2 + k;
           rect(ctx, x + Math.cos(a) * r, y - 10 + Math.sin(a) * r * 0.6, 1, 1, s.color);
         }
+      } else if (s.kind === 'impact') {
+        // a 3×3 star that opens into four flecks
+        if (k < 0.45) {
+          rect(ctx, x - 1, y - AIR - 1, 3, 3, s.color);
+          rect(ctx, x, y - AIR, 1, 1, PAL.paper);
+        }
+        const r = 2 + k * 4;
+        for (const [ux, uy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) rect(ctx, x + ux * r, y - AIR + uy * r, 1, 1, s.color);
       } else if (s.kind === 'dust') {
         rect(ctx, x - 1, y - AIR - 1 - k * 3, 1, 1, s.color);
         rect(ctx, x + 1, y - AIR - k * 4, 1, 1, s.color);

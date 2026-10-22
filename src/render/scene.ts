@@ -11,7 +11,7 @@ import { drawActor, drawItem, drawShadow, drawThrown, handAt, playerPose, redPos
 import { drawText } from './font';
 import type { Fx } from './fx';
 import { doorHole, OY, type LevelArt } from './level';
-import { line, lerp, rect, type Ctx } from './prims';
+import { line, lerp, rect, ring, type Ctx } from './prims';
 import { AIR, type Camera } from './view';
 
 export interface SceneOpts {
@@ -73,9 +73,15 @@ export function drawScene(ctx: Ctx, w: World, art: LevelArt, atlas: Atlas, fx: F
   const held = p.hands[0];
   if (o.showPlayer && w.status === 'play' && held && ITEMS[held.kind].gun && held.ammo > 0) {
     const hx = lerp(p.px, p.x, alpha), hy = lerp(p.py, p.y, alpha);
-    const len = Math.min(o.aimReach, rayLength(w, hx, hy, o.aim, ITEMS[held.kind].range));
+    const ray = rayLength(w, hx, hy, o.aim, ITEMS[held.kind].range);
+    const len = Math.min(o.aimReach, ray);
     const h = handAt('player', hx, hy, o.aim);
-    line(ctx, h.x - cam.x, h.y - cam.y, hx + Math.cos(o.aim) * len - cam.x, hy + Math.sin(o.aim) * len - AIR - cam.y, PAL.ash, 1, 0);
+    const ex = hx + Math.cos(o.aim) * len - cam.x, ey = hy + Math.sin(o.aim) * len - AIR - cam.y;
+    line(ctx, h.x - cam.x, h.y - cam.y, ex, ey, PAL.ash, 1, 0);
+    // something (a wall, a desk) would stop the shot before the cursor: mark where
+    if (ray < o.aimReach - 3) {
+      for (const [dx, dy] of [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]]) rect(ctx, ex + dx, ey + dy, 1, 1, PAL.iron);
+    }
   }
 
   // tells: aim lines, charge lanes, windups
@@ -106,14 +112,13 @@ function drawRed(ctx: Ctx, atlas: Atlas, kind: ActorKind, pose: Pose, r: World['
     // dazed: three sparks circling the head
     for (let i = 0; i < 3; i++) {
       const a = now * 6 + (i * Math.PI * 2) / 3;
-      rect(ctx, pose.x + Math.cos(a) * 5, top + 3 + Math.sin(a) * 2, 1, 1, PAL.glint);
+      rect(ctx, pose.x + Math.cos(a) * 6 - 1, top + 2 + Math.sin(a) * 2, 2, 2, PAL.hot);
     }
   }
-  if (r.guard > 0 && Math.floor(now * 12) % 2) {
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      rect(ctx, pose.x + Math.cos(a) * 11, pose.y - 14 + Math.sin(a) * 13, 1, 1, PAL.glint);
-    }
+  if (r.guard > 0 && Math.floor(now * 6) % 4) {
+    // shrugging off damage: a solid ring, dark outside and light inside so it reads on any floor
+    ring(ctx, pose.x, pose.y - 14, 15, PAL.ink);
+    ring(ctx, pose.x, pose.y - 14, 14, PAL.paper);
   }
   const telling = r.state === 'windup' || r.state === 'aim' || r.state === 'throwTell' || r.state === 'chargeTell' || r.state === 'deskTell';
   if (telling) {

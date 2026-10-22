@@ -26,10 +26,14 @@ await page.goto(base);
 await wait(1500);
 await shot('01-title');
 
-// title → map
+// title → PLAY: a fresh save goes straight into 1-1; the map comes after
 const [pxp, pyp] = await px(160, 85);
 await page.mouse.click(pxp, pyp);
 await wait(400);
+await shot('02-first-play');
+if ((await screenName()) !== 'play') errors.push(`expected 1-1 from a fresh PLAY, got ${await screenName()}`);
+await page.evaluate(() => window.__app.open('map'));
+await wait(300);
 await shot('02-map');
 if ((await screenName()) !== 'map') errors.push(`expected the map, got ${await screenName()}`);
 

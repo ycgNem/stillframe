@@ -5,7 +5,7 @@ import type { LevelDef } from './types';
 export const CH1: LevelDef[] = [
   {
     id: '1-1', name: 'ELEVATOR', seed: 101,
-    goal: { kind: 'clear' }, par: 20,
+    goal: { kind: 'clear' }, par: 13,
     challenge: { id: 'punchKills', n: 1 }, challengeText: 'PUNCH A RED TO PIECES',
     tip: 'STAND STILL TO THINK. EVERY STEP RUNS THE CLOCK.',
     floor: '.',
@@ -30,7 +30,7 @@ export const CH1: LevelDef[] = [
   },
   {
     id: '1-2', name: 'CUBICLES', seed: 102,
-    goal: { kind: 'clear' }, par: 22,
+    goal: { kind: 'clear' }, par: 8,
     challenge: { id: 'fists' }, challengeText: 'FISTS ONLY: NO SHOTS, NO THROWS',
     tip: 'PUNCH AN ARMED RED AND ITS GUN DROPS. CLICK A GUN TO TAKE IT.',
     map: [
@@ -50,7 +50,7 @@ export const CH1: LevelDef[] = [
   },
   {
     id: '1-3', name: 'BREAK ROOM', seed: 103,
-    goal: { kind: 'clear' }, par: 28,
+    goal: { kind: 'clear' }, par: 16,
     challenge: { id: 'stunKills', n: 3 }, challengeText: '3 KILLS ON STUNNED REDS',
     tip: 'RIGHT CLICK THROWS. A HIT STUNS AND DISARMS. THEN FINISH IT.',
     map: [
@@ -70,7 +70,7 @@ export const CH1: LevelDef[] = [
   },
   {
     id: '1-4', name: 'COPY ROOM', seed: 104,
-    goal: { kind: 'clear' }, par: 24,
+    goal: { kind: 'clear' }, par: 15,
     challenge: { id: 'noMiss' }, challengeText: 'NO MISSED SHOTS',
     tip: 'BULLETS GO THROUGH GLASS. AN EMPTY GUN STILL MAKES A GOOD BRICK.',
     map: [
@@ -90,7 +90,7 @@ export const CH1: LevelDef[] = [
   },
   {
     id: '1-5', name: 'CONFERENCE', seed: 105,
-    goal: { kind: 'clear' }, par: 45,
+    goal: { kind: 'clear' }, par: 28,
     challenge: { id: 'combo', n: 3 }, challengeText: 'A 3-KILL COMBO (EACH WITHIN 1 S)',
     tip: 'THEY KEEP COMING THROUGH THE DOORS. WATCH YOUR BACK.',
     map: [
@@ -116,7 +116,7 @@ export const CH1: LevelDef[] = [
   },
   {
     id: '1-6', name: 'STAIRWELL', seed: 106,
-    goal: { kind: 'escape' }, par: 22,
+    goal: { kind: 'escape' }, par: 9,
     challenge: { id: 'noKills' }, challengeText: 'ESCAPE WITHOUT SHATTERING ANYONE',
     tip: 'GET TO THE EXIT AT THE TOP. FIGHTING IS OPTIONAL.',
     map: [
@@ -182,7 +182,7 @@ export const CH1: LevelDef[] = [
   },
   {
     id: '1-8', name: 'THE MANAGER', seed: 108,
-    goal: { kind: 'clear' }, par: 50,
+    goal: { kind: 'clear' }, par: 24,
     challenge: { id: 'bossPunch' }, challengeText: 'FINISH THE MANAGER WITH A PUNCH',
     tip: 'HE THROWS DESKS: SHOOT THEM OUT OF THE AIR, OR STEP ASIDE.',
     map: [
@@ -196,7 +196,7 @@ export const CH1: LevelDef[] = [
       '#......................#',
       '#..TT..............TT..#',
       '#......................#',
-      '#.s........P........p..#',
+      '#.s........P.........p.#',
       '#..TT..............TT..#',
       '#......................#',
       '#####D############D#####',

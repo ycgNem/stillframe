@@ -1,7 +1,9 @@
 // One scenario per verb (docs/PLAN.md M2): punch disarms, throw stuns, parry, gunner keeps range, and the rest.
 import { describe, expect, it } from 'vitest';
-import { COINS, TILE } from '../src/data/tuning';
-import { CHARGE } from '../src/data/reds';
+import { COINS, COMBAT, PLAYER, TILE } from '../src/data/tuning';
+import { CHARGE, MANAGER, REDS } from '../src/data/reds';
+import { hurtRed } from '../src/sim/kills';
+import type { Bullet, World } from '../src/sim/types';
 import { challengeMet } from '../src/sim/challenges';
 import { step } from '../src/sim/world';
 import { aimAt, input, room, run } from './helpers';
@@ -89,7 +91,7 @@ describe('guns', () => {
     expect(v.stats.misses).toBe(1);
   });
 
-  it('a bullet that meets a red bullet cancels it: a parry, +3 coins', () => {
+  it('a bullet that meets a red bullet cancels it: a parry, and it pays', () => {
     const w = room(place(['P', 2, 3], ['G', 9, 3]), {}, { loadout: 'pistol' });
     const g = w.reds[0];
     g.cooldown = 0;
@@ -339,5 +341,100 @@ describe('goals and waves', () => {
     expect(s.status).toBe('play');
     run(s, 2);
     expect(s.status).toBe('clear');
+  });
+});
+
+// The first critic pass (critique/2026-10-22-mvp.md): fights that were solved, and controls that fought you.
+describe('critic pass 1', () => {
+  const SURVIVE = { goal: { kind: 'survive' as const, seconds: 99 } };
+  const bullet = (w: World, o: Partial<Bullet>): Bullet => ({
+    id: w.nextId++, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, from: 'player', owner: 0, life: 300, damage: 3, hit: false, ...o,
+  });
+
+  it('only a red bullet already in flight when you fired can be parried; shots traded at once pass', () => {
+    for (const redFirst of [true, false]) {
+      const w = room(place(['P', 2, 5]), SURVIVE);
+      const mk = (from: 'player' | 'red') => bullet(w, from === 'player'
+        ? { from, x: 40, y: 40, px: 40, py: 40, vx: 220 }
+        : { from, x: 120, y: 40, px: 120, py: 40, vx: -136 });
+      const [first, second] = redFirst ? [mk('red'), mk('player')] : [mk('player'), mk('red')];
+      w.bullets.push(first, second);
+      const ev = run(w, 30);
+      expect(ev.some((e) => e.t === 'parry')).toBe(redFirst);
+    }
+  });
+
+  it('a gunner keeps strafing while its aim line is dotted, and holds still once it locks', () => {
+    const w = room(place(['P', 2, 3], ['G', 9, 3]), SURVIVE);
+    const g = w.reds[0];
+    g.state = 'aim';
+    g.t = REDS.gunner.aimTell;
+    const x0 = g.x, y0 = g.y;
+    run(w, 12);
+    expect(Math.hypot(g.x - x0, g.y - y0)).toBeGreaterThan(2);
+    while (g.state === 'aim' && g.t > REDS.gunner.aimLock) step(w, input());
+    const x1 = g.x, y1 = g.y;
+    while (g.state === 'aim') step(w, input());
+    expect(Math.hypot(g.x - x1, g.y - y1)).toBeLessThan(0.01);
+  });
+
+  it('a punched-loose gun lands toward you, and the red cannot grab it straight back', () => {
+    const w = room(place(['P', 3, 3], ['q', 5, 3]), SURVIVE);
+    const r = w.reds[0], p = w.player;
+    r.x = p.x + p.r + r.r + 10;
+    r.px = r.x;
+    step(w, input({ aim: 0, fire: true }));
+    const gun = w.items.find((i) => i.kind === 'pistol')!;
+    expect(gun).toBeDefined();
+    expect(r.x - gun.x).toBeGreaterThan(COMBAT.disarmDrop * 0.8);
+    run(w, Math.floor(COMBAT.regrab * 60) - 2);
+    expect(r.held).toBeNull();
+  });
+
+  it('friendly fire only chips the Manager', () => {
+    const w = room(place(['P', 2, 3], ['M', 8, 3]), SURVIVE);
+    const m = w.reds[0];
+    hurtRed(w, m, 99, 'friendly', [], { aim: 0 });
+    expect(m.dead).toBe(false);
+    expect(m.hp).toBe(REDS.manager.hp - MANAGER.friendlyDamage);
+  });
+
+  it('a punch goes to the red you aim at, not just the nearest one', () => {
+    const w = room(place(['P', 5, 3], ['g', 6, 3], ['g', 6, 2]), SURVIVE);
+    const [near, aimed] = w.reds;
+    step(w, input({ aim: aimAt(w, aimed.x, aimed.y), fire: true }));
+    expect(aimed.hp).toBe(REDS.grunt.hp - PLAYER.punchDamage);
+    expect(near.hp).toBe(REDS.grunt.hp);
+  });
+
+  it('Stride moves you further per game tick', () => {
+    const dist = (stride: number) => {
+      const w = room(place(['P', 1, 3]), SURVIVE, { stride });
+      const x0 = w.player.x;
+      run(w, 30, input({ mx: 1 }));
+      return w.player.x - x0;
+    };
+    expect(dist(3) / dist(0)).toBeGreaterThan(1.35);
+  });
+
+  it('brushing a wall corner slides you round it', () => {
+    const w = room([
+      '######',
+      '#....#',
+      '##.###',
+      '#....#',
+      '#P...#',
+      '######',
+    ], SURVIVE);
+    const p = w.player;
+    p.x = p.px = 2 * TILE + p.r - 3;
+    run(w, 60, input({ my: -1 }));
+    expect(p.y).toBeLessThan(2 * TILE);
+  });
+
+  it('the death names the red that did it', () => {
+    const w = room(place(['P', 3, 3], ['g', 4, 3]), SURVIVE);
+    const ev = run(w, 120);
+    expect(ev.find((e) => e.t === 'death')).toMatchObject({ by: w.reds[0].id });
   });
 });

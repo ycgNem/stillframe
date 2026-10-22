@@ -28,6 +28,10 @@ export interface Screen {
   frame(realDt: number, alpha: number): void;
   /** the mouse pointer to draw */
   cursor?: 'aim' | 'pointer' | 'none';
+  /** the crosshair lights up: what you click now will land (a punch in reach) */
+  cursorLock?: boolean;
+  /** the window lost focus */
+  blur?(): void;
 }
 
 export class App {
@@ -60,6 +64,10 @@ export class App {
       frame: (realDt, alpha) => this.frame(realDt, alpha),
     });
     this.loop.start();
+    addEventListener('blur', () => this.screen.blur?.());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.screen.blur?.();
+    });
   }
 
   goto(s: Screen) {
@@ -112,7 +120,8 @@ export class App {
       for (const [dx, dy, w, h] of [[-5, 0, 3, 1], [3, 0, 3, 1], [0, -5, 1, 3], [0, 3, 1, 3]]) {
         rect(ctx, x + dx - (w > 1 ? 0 : 1), y + dy - (h > 1 ? 0 : 1), w + (w > 1 ? 0 : 2), h + (h > 1 ? 0 : 2), PAL.paper);
       }
-      for (const [dx, dy, w, h] of [[-5, 0, 3, 1], [3, 0, 3, 1], [0, -5, 1, 3], [0, 3, 1, 3]]) rect(ctx, x + dx, y + dy, w, h, PAL.ink);
+      const arms = this.screen.cursorLock ? PAL.tide : PAL.ink;
+      for (const [dx, dy, w, h] of [[-5, 0, 3, 1], [3, 0, 3, 1], [0, -5, 1, 3], [0, 3, 1, 3]]) rect(ctx, x + dx, y + dy, w, h, arms);
       rect(ctx, x, y, 1, 1, PAL.cyan);
       return;
     }

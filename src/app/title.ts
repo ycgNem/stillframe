@@ -8,7 +8,7 @@ import { starCount } from '../meta/save';
 import { Fx } from '../render/fx';
 import { bigWidth, centerText, drawBig, drawText } from '../render/font';
 import { LevelArt } from '../render/level';
-import { dither, rect } from '../render/prims';
+import { dither, dither4, rect } from '../render/prims';
 import { drawScene } from '../render/scene';
 import { followCamera, newCamera, VIEW } from '../render/view';
 import { createTime, updateTime, type TimeState } from '../sim/time';
@@ -17,6 +17,7 @@ import { createWorld, NO_MODS, step } from '../sim/world';
 import { coinIcon, star } from '../ui/kit';
 import type { App, Screen } from './app';
 import { MapScreen } from './map';
+import { PlayScreen } from './play';
 import { SettingsScreen } from './settings';
 import { WorkshopScreen } from './workshop';
 
@@ -70,7 +71,7 @@ export class TitleScreen implements Screen {
     const thinking = Math.floor(this.world.tick / 40) % 3 === 0;
     const inp = thinking ? { ...this.input, mx: 0, my: 0 } : this.input;
     for (const e of step(this.world, inp)) this.fx.event(e, this.world);
-    this.fx.tick(1 / TICK_RATE);
+    this.fx.tick(1 / TICK_RATE, this.world);
   }
 
   frame(realDt: number, alpha: number) {
@@ -80,8 +81,9 @@ export class TitleScreen implements Screen {
     this.fx.real(realDt, this.cam, { x: 0, y: 0 });
     drawScene(ctx, w, this.art, this.app.atlas, this.fx, this.cam, alpha, { aim: p.aim, hoverItem: 0, now: this.app.now, showPlayer: true, aimReach: 0 });
     ui.begin();
-    // the title band
-    dither(ctx, 0, 0, VIEW.w, VIEW.h, PAL.ink);
+    // the title band; the demo stays bright except behind the buttons
+    dither4(ctx, 0, 0, VIEW.w, VIEW.h, PAL.ink);
+    dither(ctx, VIEW.w / 2 - 58, 70, 116, 64, PAL.ink);
     rect(ctx, 0, 18, VIEW.w, 44, PAL.paper);
     rect(ctx, 0, 18, VIEW.w, 1, PAL.fog);
     rect(ctx, 0, 61, VIEW.w, 1, PAL.ash);
@@ -95,7 +97,8 @@ export class TitleScreen implements Screen {
 
     const bx = VIEW.w / 2 - 50;
     const started = Object.keys(this.app.save.levels).length > 0;
-    if (ui.button('play', bx, 76, 100, 18, started ? 'CONTINUE' : 'PLAY', { primary: true, key: 'Enter', big: true })) this.app.goto(new MapScreen(this.app));
+    // a fresh save goes straight into the first level; the map comes after
+    if (ui.button('play', bx, 76, 100, 18, started ? 'CONTINUE' : 'PLAY', { primary: true, key: 'Enter', big: true })) this.app.goto(started ? new MapScreen(this.app) : new PlayScreen(this.app, '1-1', true));
     if (ui.button('workshop', bx, 98, 100, 14, 'WORKSHOP')) this.app.goto(new WorkshopScreen(this.app, '1-1'));
     if (ui.button('settings', bx, 116, 100, 14, 'SETTINGS')) this.app.goto(new SettingsScreen(this.app, null));
 
@@ -106,7 +109,7 @@ export class TitleScreen implements Screen {
     coinIcon(ctx, 44, VIEW.h - 17);
     drawText(ctx, `${s.coins}`, 51, VIEW.h - 17, PAL.gold);
     drawText(ctx, 'WASD MOVE  MOUSE AIM  CLICK SHOOT/PUNCH  RIGHT CLICK THROW', 8, VIEW.h - 9, PAL.slate);
-    const v = 'V1.0';
+    const v = 'CHAPTER 1 OF 5';
     drawText(ctx, v, VIEW.w - 4 - v.length * 4, VIEW.h - 17, PAL.iron);
     ui.end();
   }

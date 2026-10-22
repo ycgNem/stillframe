@@ -1,5 +1,7 @@
 # Stillframe
 
+**Play it: https://ycgnem.github.io/stillframe/**
+
 **Time moves when you move.** A top-down pixel-art take on SUPERHOT for the browser: stand still and
 the world crawls at 3% speed, walk and it runs, and every shot or throw buys a split second of
 full-speed time. Red glass enemies shatter in one hit, and so do you.
@@ -21,7 +23,7 @@ npm run dev        # http://localhost:5200
 npm test           # Vitest (headless)
 npm run build      # typecheck + production build into dist/
 npm run preview    # serve the production build
-node e2e/smoke.mjs http://127.0.0.1:5200/      # Playwright: boot, play, every screen (also clear.mjs, levels.mjs, abilities.mjs)
+node e2e/smoke.mjs http://127.0.0.1:5200/      # Playwright: boot, play, every screen (also clear.mjs, levels.mjs, abilities.mjs, screens.mjs)
 node scripts/run.mjs scripts/economy.ts        # the bot plays Chapter 1; coins against Workshop prices
 python pixel-art/build_atlas.py --all          # redraw every sprite and repack src/art/sheet.png
 ```
@@ -82,13 +84,11 @@ see [docs/ART_BUDGET.md](docs/ART_BUDGET.md) and the art contract in [docs/STYLE
 
 ## Deploying to GitHub Pages
 
-One-time setup:
-1. Create a GitHub repository and push `main`.
-2. In the repository, go to **Settings → Pages → Build and deployment → Source** and choose
-   **GitHub Actions**.
+Live at **https://ycgnem.github.io/stillframe/** (repository github.com/ycgNem/stillframe). Every
+push to `main` runs the tests, builds, and publishes there (`.github/workflows/deploy.yml`).
 
-After that, every push to `main` runs the tests, builds, and publishes to
-`https://<user>.github.io/<repo>/`.
+For a fork: push `main`, then in the repository choose **Settings → Pages → Build and deployment →
+Source: GitHub Actions**; it publishes to `https://<user>.github.io/<repo>/`.
 
 ## Docs
 
@@ -96,4 +96,5 @@ After that, every push to `main` runs the tests, builds, and publishes to
 - [docs/PLAN.md](docs/PLAN.md): technical approach, milestones with "done when" checks, risks, decisions log
 - [docs/STYLE.md](docs/STYLE.md): palette, sizes, shading, animation, readability rules, art pipeline
 - [docs/ART_BUDGET.md](docs/ART_BUDGET.md): the 100-generation PixelLab plan and ledger
+- [critique/](critique/): fresh-eyes playtest reports from the critic agent, and what was done about them
 - [CLAUDE.md](CLAUDE.md): rules for AI-assisted sessions in this repo

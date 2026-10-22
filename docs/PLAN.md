@@ -99,7 +99,7 @@ Each one ends playable. MVP = M0–M7 (Chapter 1 complete with upgrades and art)
 - [x] Sim boundary enforced. *(`tests/sim-boundary.test.ts`)*
 - [x] Time toy: move, aim, click to shoot, reds walk at you, R restarts, clear screen.
       *(`tests/world.test.ts`, `tests/time.test.ts`; played in the browser pane.)*
-- [x] Play.bat, deploy workflow, docs. *(Files exist; the deploy runs once a GitHub repo is made.)*
+- [x] Play.bat, deploy workflow, docs. *(First deploy ran 2026-10-22: Actions run 39738129309.)*
 
 ### M1 — Time core and feel ✅
 The time rule feels right before anything else is built on it.
@@ -181,7 +181,9 @@ Follows [STYLE.md](STYLE.md) and [ART_BUDGET.md](ART_BUDGET.md).
       console errors in any e2e run. Not yet judged by a human ear.)*
 - [x] Workshop: Frameskip, Rewind, Arm, Holster. *(tests "Frameskip…", "Arm III…", "Holster…";
       `e2e/abilities.mjs`: dash, shield and rewind in the real app.)*
-- [ ] Deploy to GitHub Pages.
+- [x] Deploy to GitHub Pages. *(github.com/ycgNem/stillframe; Actions run 39738129309 green: test →
+      build → deploy. `node e2e/clear.mjs https://ycgnem.github.io/stillframe/ 1-1` clears 1-1 on the
+      live site through replay, tally and save.)*
 - [ ] Done when: a fresh player finishes Chapter 1 in 20–40 min (playtest note), all tests and e2e
       pass, the live link works.
 
@@ -206,7 +208,8 @@ Follows [STYLE.md](STYLE.md) and [ART_BUDGET.md](ART_BUDGET.md).
 ### M12 — 1.0
 - [ ] Gauntlet mode.
 - [ ] Perf budget: 60 fps with 40 reds and 300 shards on a laptop (`e2e/perf.mjs`).
-- [ ] Critic passes (fresh-eyes playtest reports in `critique/`), fixes.
+- [ ] Critic passes (fresh-eyes playtest reports in `critique/`), fixes. *(Pass 1 done 2026-10-22: its
+      critical and major issues fixed, see the decisions log; more passes before 1.0.)*
 - [ ] Patch notes, README, live.
 
 ### Stretch
@@ -256,3 +259,10 @@ Electron/desktop build.
 | 2026-10-22 | Bullets and throws are drawn 7 px above the floor (`AIR`) and the cursor is read 7 px lower | so clicking on a red's chest aims at the red |
 | 2026-10-22 | Art: characters hand-drawn by a parametric build script (5 directions × 7 frames each, 0 PixelLab generations); tiles, props, fonts, UI and shard FX drawn from the palette in code at runtime; the atlas packer is Python (`pixel-art/build_atlas.py`) | consistent palette-locked look with no metered spending; the art toolchain is already Python + Pillow |
 | 2026-10-22 | A bot (`src/bot/bot.ts`, pure, reads the World and returns TickInputs) plays the levels in tests, the economy script, the title screen and `app.autoplay` | one player-shaped thing proves levels clearable, measures the economy and makes the attract mode |
+| 2026-10-22 | First critic pass (`critique/2026-10-22-mvp.md`): aiming stays free; instead gunners strafe at 60% speed while their aim line is dotted and keep 80–128 px | the free-kill window came from a stationary tell, not from free aim; planning a shot stays the fun part |
+| 2026-10-22 | Only a red bullet already in flight when you fired can be parried (the lower id is the older bullet); parry radius 3 → 2 px, pay +3 → +2 | traded shots were cancelling each other by accident and paid more than kills |
+| 2026-10-22 | Punch reach 12 → 15 px (edge to edge), knockback 7 → 4 px, and a punch goes to the red nearest your aim | the knockback pushed reds just out of reach, so every second punch whiffed |
+| 2026-10-22 | Stride is a speed gain in game time (×1.15/1.3/1.45) with the walking time scale divided by the same; Trigger bursts 0.10/0.04/0.02 s | slowing time while walking changed nothing the sim could see: everyone moved the same distance per tick |
+| 2026-10-22 | Par ≈ 1.6× the bot's clean game time | pars set with generous slack made a third of all stars free |
+| 2026-10-22 | Friendly fire on the Manager does 1 damage; disarmed weapons drop 18 px toward you and the red can't grab for 0.8 s | the boss died to its own gunner, and disarmed reds re-armed in the same tick |
+| 2026-10-22 | Hit-stop (0.05 s per shatter, 1 s for the Manager) and the post-clear beat are app-level: the screen returns time scale 0 | the sim stays unaware of presentation, and replays stay exact |

@@ -4,6 +4,24 @@ Running notes for whoever (human or AI session) picks this up next. Newest statu
 
 ## Status
 
+**2026-10-22 (night) — Live at https://ycgnem.github.io/stillframe/; first critic pass done.**
+
+- **Published:** repo github.com/ycgNem/stillframe (public), Pages from GitHub Actions; every push to
+  `main` tests, builds and deploys. First run green; `node e2e/clear.mjs https://ycgnem.github.io/stillframe/ 1-1`
+  clears a level on the live site through replay, tally and save.
+- **Critic pass 1** (`critique/2026-10-22-mvp.md`, with a table of what was fixed and how it was
+  checked): the tally ignored mouse clicks (fixed); gunners now strafe through the dotted part of their
+  aim tell; only bullets already in flight can be parried; punches reach 15 px and go to the red you
+  aim at; Stride is a real speed gain; pars are about 1.6× the bot's time; the Manager can't be killed
+  by its own side and gets a card when it breaks; death holds, rings the killer and names it in a strip
+  up top; hit-stop on shatters; corner sliding; pause on blur. Decisions logged in PLAN.md.
+- **New check:** `e2e/screens.mjs [url]`: the blocked-shot mark, the death hold and strip, NEXT on
+  the tally by mouse, the PHASE banner and the boss card. 71 Vitest tests.
+- **Still for a human:** whether Chapter 1 takes 20–40 minutes for a fresh player (M7's last box,
+  unticked), whether the new pars feel fair, and the sound by ear.
+- **Next:** M8 (abilities and balance): the economy against the 70% target with the tighter pars;
+  gunners need a back-view tell (they look like grunts from behind); a second critic pass.
+
 **2026-10-22 (evening) — M1–M6 done, M7 built (Chapter 1 complete); deploying.**
 
 - Everything from the time core to a full Chapter 1: see PLAN.md's ticked boxes, each with how it was

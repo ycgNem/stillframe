@@ -28,7 +28,7 @@ that is where tuning happens. This document describes the rules.
 
 | From SUPERHOT | Our twist |
 |---|---|
-| Time moves when you move | Upgrades bend the rule: **Stride** (walking runs time slower), **Trigger** (shorter action bursts), **Frameskip** (a dash in zero time) |
+| Time moves when you move | Upgrades bend the rule: **Stride** (you outpace time as you walk), **Trigger** (shorter action bursts), **Frameskip** (a dash in zero time) |
 | One-hit deaths, instant restart | **Shield** upgrade (one free hit per level) and **Rewind** (die, and jump back 2 seconds instead) |
 | Red crystal enemies that shatter | Shards scatter as real pixel fragments in slowed time; each red drops **coins** |
 | Pick up, shoot, throw the empty gun | **Holster** (carry two), **Reach** (grab from further, later catch thrown guns mid-air) |
@@ -67,13 +67,13 @@ that is where tuning happens. This document describes the rules.
 |---|---|
 | Move | WASD (arrows also work) |
 | Aim | Mouse |
-| Shoot / punch / slash | Left click (an empty gun or a throwable is thrown instead) |
+| Shoot / punch / slash | Left click (an empty gun or a throwable is thrown instead). The crosshair turns teal when a punch would land |
 | Throw held item | Right click |
-| Pick up | Click an item in reach (it lights up cyan), or E for the nearest |
+| Pick up | Click an item in reach (it lights up cyan), or E for the nearest. A click on an item out of reach does nothing ("TOO FAR"); with a red under the cursor, a click is always an attack |
 | Frameskip (dash, upgrade) | Space |
 | Swap weapon (Holster) | Q or mouse wheel |
 | Restart level | R |
-| Pause | Esc |
+| Pause | Esc (the game also pauses when its window loses focus) |
 | Debug overlay | F3 (time scale, ticks/s, burst, game vs real time); `?debug` in the URL adds sliders for `TIME` |
 
 All keys are rebindable (M11). Controller support is a stretch goal.
@@ -85,12 +85,13 @@ All keys are rebindable (M11). Controller support is a stretch goal.
 | Situation | Time scale | Tuning (`TIME` in `src/data/tuning.ts`) |
 |---|---|---|
 | Standing still | 0.03 (3%) | `idle` |
-| Walking at full speed | 1.0 | `walk` (Stride lowers it) |
+| Walking at full speed | 1.0 | `walk` (Stride divides it by your speed gain) |
 | Action burst (shot, punch, throw, pickup) | 1.0 for 0.18 game s | `burstScale`, `burst` (Trigger shortens it) |
 | Ramp toward the target | 14/s up, 10/s down | `rampUp`, `rampDown` |
 
 - **Aiming is free.** Turning the mouse doesn't move time, so you can always plan a shot. (Decision
-  2026-10-22; revisit if precise aim makes levels trivial.)
+  2026-10-22, kept after the first critic pass: what made gunfights trivial was gunners standing still
+  through their tell, so now they strafe through it, §7.)
 - **A click waits for its shot.** Clicking during a weapon cooldown runs time until the weapon is
   ready, then fires. Cooldowns tick in game time, so you can't spam while frozen.
 - **The sim never sees the scale.** It runs fixed 60 Hz ticks of game time; the time rule only decides
@@ -119,7 +120,7 @@ Weapons are black. Guns have **no reload**: when empty, throw them.
 
 | Item | Use | Ammo | Cooldown (game s) | Notes |
 |---|---|---|---|---|
-| Fists | punch, 1.2 tile reach | — | 0.35 | 1 damage; the first punch disarms |
+| Fists | punch, 15 px from your edge to theirs, in a 115° cone | — | 0.35 | 1 damage; the first punch disarms; hits the red nearest your aim |
 | Pistol | 1 bullet, 220 px/s | 6 | 0.30 | the workhorse |
 | Shotgun | 5 pellets, 20° spread | 2 | 0.80 | pellets die after 5 tiles |
 | SMG | 3-round burst | 12 (4 bursts) | 0.12 per shot | ch2+ |
@@ -128,15 +129,19 @@ Weapons are black. Guns have **no reload**: when empty, throw them.
 
 - **Damage:** reds have **3 integrity**. Bullets and katana deal 3 (one-shot), punches deal 1.
   Throws deal 0 but stun and disarm (Arm II makes any thrown item shatter Grunts and Gunners).
-- **Punches** stun for 0.35 s and knock the red back half a tile; the first punch on an armed red
-  knocks its weapon loose. A punch landed on a throw-stunned red keeps it stunned, so throw-then-fists
-  is a stun kill.
+- **Punches** stun for 0.35 s and knock the red back 4 px (little enough that the next punch still
+  reaches); the first punch on an armed red knocks its weapon loose. Of the reds in reach, a punch goes
+  to the one nearest where you aim. A punch landed on a throw-stunned red keeps it stunned, so
+  throw-then-fists is a stun kill.
+- **Disarms:** a punched or hit red drops its weapon 18 px toward you and can't pick anything up for
+  0.8 s, so the gun is yours to grab.
 - **Reds' bullets fly at 62% of yours** (pistol 136 px/s against your 220), so a frozen room is
   always readable and every shot can be dodged. Reds' bullets shatter other reds too: that counts as
   your kill (base coins and combos, no style bonus).
 - **Parries:** a bullet of yours that meets a red's bullet, or something a red threw (a bottle, the
-  Manager's desk), destroys both.
-- **Bullets collide with bullets.** Shooting a bullet out of the air is a **parry** (§10).
+  Manager's desk), destroys both. Only a red bullet that was **already flying when you fired** can be
+  parried: two shots traded at the same moment pass each other, so a shootout isn't settled by
+  accident. Shooting a bullet out of the air pays (§10).
 - **Bullets stop at walls**; glass panes shatter and let them through once.
 
 ---
@@ -148,7 +153,7 @@ All reds are red glass. They shatter into pixel fragments and drop coins (§10).
 | Red | Integrity | Speed (px/s) | Behaviour | First chapter |
 |---|---|---|---|---|
 | **Grunt** | 3 | 30 | walks at you, punches with a 0.5 s windup; uses any weapon it holds | 1 |
-| **Gunner** | 3 | 26 | pistol; keeps 4–7 tiles away, strafes, fires with a 0.4 s aim tell | 1 |
+| **Gunner** | 3 | 26 | pistol; keeps 5–8 tiles away, strafes even while aiming, fires after a 0.55 s aim tell | 1 |
 | **Brute** | 9 | 20 | shrugs off throws (stun only); charges in a straight line after a 0.8 s tell | 1 (boss), 2 |
 | **Runner** | 3 | 60 | zigzags in, fists only | 2 |
 | **Sniper** | 3 | 0 | draws a red laser line for 1.5 s, then fires a fast bullet (400 px/s) | 3 |
@@ -162,16 +167,21 @@ around obstacles with a flow field.
 As built (numbers in `src/data/reds.ts`):
 - **Punch:** starts when the gap between you is 6 px, winds up 0.5 s (a red arc and a "!" show it),
   lands if you are still within 10 px and inside its cone. Step back or aside to make it miss.
-- **Gunner:** keeps 4–7 tiles away and strafes; aims for 0.55 s (a red line, dotted while it tracks
-  you, solid for the last 0.15 s once it locks), then fires; 1.2 s between shots. A gunner with a
+- **Gunner:** keeps 80–128 px away and strafes; aims for 0.55 s (a red line, dotted while it tracks
+  you, solid for the last 0.15 s once it locks), then fires; 1.2 s between shots. While the line is
+  dotted it keeps strafing at 60% speed, so a shot at it then has to lead; once the line locks it
+  stands still, so the sure kill is a shot fired at the lock, followed by a step out of its bullet's
+  way. A gunner with a
   loaded gun never punches. Out of ammo, it throws the gun at you (0.4 s tell) and fights on unarmed.
 - **Brute:** charges after a 0.8 s tell (a red lane): 135 px/s for up to 1.3 s; reds in the way
   shatter (your kills); glass bursts; a wall leaves it dazed for 1.4 s. After a throw stuns a Brute
   (only 0.4 s), more throws bounce off for 2.5 s, so it can't be stun-locked.
 - **The Manager** (18 integrity): throws a desk every 2.6 / 2.2 / 1.7 s (0.75 s tell); a desk kills
   you, breaks glass and other reds, and can be shot out of the air (a parry). At 12 and 6 integrity a
-  new phase begins: it roars, shrugs off damage for 1.5 s and calls reds through the doors; from the
-  second phase on it also charges like a Brute.
+  new phase begins ("PHASE 2", "PHASE 3"): it roars, shrugs off damage for 1.5 s (a dark ring shows
+  it) and calls reds through the doors; from the second phase on it also charges like a Brute. Its own
+  side's stray bullets and desks only chip it (1 damage), so the last blow is yours. When it breaks the
+  room stops for a second and its name comes up.
 
 **Bosses** (one per chapter, level X-8):
 
@@ -195,7 +205,9 @@ As built (numbers in `src/data/reds.ts`):
   - **Survive:** stay alive for N game seconds (only moving time counts down).
 - **Stars (3 per level):**
   1. ★ **Clear** the level.
-  2. ★ **Par:** clear under the level's par **game** time.
+  2. ★ **Par:** clear under the level's par **game** time. Pars are about 1.6× the bot's clean
+     time (1-1 13 s · 1-2 8 · 1-3 16 · 1-4 15 · 1-5 28 · 1-6 9 · 1-8 24): a clean run earns it, a
+     sloppy one doesn't.
   3. ★ **Challenge:** one rule per level, shown on the intro card, checked by the sim
      (`src/sim/challenges.ts`): Fists only · N kills on stunned reds · No shots fired · No missed
      shots · A combo of N · Escape without a kill · Punch kills · N kills · Finish the boss with a
@@ -230,7 +242,7 @@ counter; they are **banked only when the level is cleared** (die and that attemp
 | Shatter a red | 2 (Brute 5, boss 25) |
 | **Combo:** each extra kill within 1.0 game s of the last | +1, +2, +3 … |
 | Thrown kill (Arm II) or stun-then-kill | +2 |
-| **Parry:** a bullet shot or cut out of the air | +3 |
+| **Parry:** a bullet shot or cut out of the air | +2 |
 | Ricochet kill (Arm III) | +3 |
 | Frameskip kill (Frameskip III) | +2 |
 | Level clear | +5 |
@@ -240,8 +252,8 @@ counter; they are **banked only when the level is cleared** (die and that attemp
 - **Repeat clears** pay 50% of every line (kills, combos, style, clear, untouched; rounded down) and
   nothing for stars already earned.
 - **Measured** (`node scripts/run.mjs scripts/economy.ts`, the bot playing Chapter 1 in order): the
-  first pass pays 479 coins with 18/24 stars (first clears of 46–82 each: more than the 25–45
-  target, mostly from the three new stars); a second pass adds about 130. That buys every tier I,
+  first pass pays 479 coins with 19/24 stars (first clears of 43–96 each: more than the 25–45
+  target, mostly from the three new stars; the bot beats every par, a human will miss some); a second pass adds about 130. That buys every tier I,
   the Pistol and the Holster, about 20% of the whole Workshop. Chapters 2–5 are meant to pay for the
   rest.
 - **Targets:** a first clear of a chapter-1 level pays about 25–45 coins; the whole of chapter 1 with
@@ -258,8 +270,8 @@ maxed = 2,720 coins).
 
 | Track | I | II | III |
 |---|---|---|---|
-| **Stride** — walking runs time slower | walk scale 0.85 | 0.72 | 0.60 |
-| **Trigger** — shorter action burst | 0.14 s | 0.10 s | 0.06 s |
+| **Stride** — you outpace time: you walk faster in game time, and the walking time scale drops by as much, so you cross a room as fast as ever while the world slows | +15% | +30% | +45% |
+| **Trigger** — shorter action burst | 0.10 s | 0.04 s | 0.02 s |
 | **Shield** | one free hit per level | its break stuns reds within 2 tiles | two free hits |
 | **Frameskip** (Space) — dash 3 tiles in **zero** game time | unlock, 4 s game cooldown | 4 tiles, 2.5 s | dashing through a red shatters it |
 | **Rewind** — die, jump back 2 game s instead | 1 charge per level | 2 charges | charges refill each wave |
@@ -310,12 +322,17 @@ Challenge stars still apply with upgrades on (Fists only means fists only).
 
 ```
 Title ──► Chapter map ──► Level intro card ──► Play ──► (dead: "SHATTERED", R) ──► Play
-               ▲  │                                └──► Clear ──► STILL. FRAME. replay ──► Tally ──┐
+               ▲  │                                └──► Clear (a beat) ──► STILL. FRAME. replay ──► Tally ──┐
                │  └──► Workshop                                                                     │
                └─────────────────────────────── Next / Map / Workshop ◄─────────────────────────────┘
 ```
 
-- **Title:** live attract mode (a scripted replay), Play, Gauntlet, Settings.
+- **Title:** live attract mode (a scripted replay), Play, Gauntlet, Settings. On a fresh save, Play
+  goes straight into 1-1 without the intro card; after that it opens the chapter map.
+- **Death:** the room freezes and the red that got you is ringed, with a dotted line to where you
+  stood; after 0.6 s a strip at the top says "SHATTERED BY A GUNNER" and how to try again.
+- **Clear:** everything holds mid-air for 0.7 s (1.8 s after the Manager) under a small "CLEARED",
+  then the replay. Every shatter also freezes the room for 0.05 s (hit-stop).
 - **Chapter map:** level nodes on a pixel floor plan, stars and coins per node, the Workshop door.
 - **Tally:** coin lines counting up one by one, stars stamping in, real vs game time.
 - **Settings:** volume, keybinds, screen shake, flash reduction (Strobe chapter), outline-enemies mode.

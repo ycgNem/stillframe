@@ -29,14 +29,14 @@ export const PLAYER = {
   /** px/s² toward the input direction, and back to rest: full speed in about 0.08 s */
   accel: 900,
   decel: 1200,
-  /** fists: centre to the red's edge, and the cone in front (radians, full width) */
-  punchReach: 12,
+  /** fists: the gap between your edge and the red's, and the cone in front (radians, full width) */
+  punchReach: 15,
   punchArc: 2.0,
   punchCooldown: 0.35,
   punchDamage: 1,
   /** a punched red is stunned this long and knocked back this far */
   punchStun: 0.35,
-  punchKnock: 7,
+  punchKnock: 4,
   throwSpeed: 240,
   /** thrown items drop after flying this far */
   throwRange: 190,
@@ -46,6 +46,8 @@ export const PLAYER = {
   /** shield II stuns reds within this radius when it breaks */
   shieldStunRadius: 32,
   shieldStun: 0.8,
+  /** brushing a wall corner by up to this many px slides you round it */
+  cornerSlide: 4,
 };
 
 export const COMBAT = {
@@ -53,16 +55,18 @@ export const COMBAT = {
   redBulletScale: 0.62,
   /** random aim error of a red's shot, radians either way */
   redSpread: 0.035,
-  /** two bullets this close (segment to segment) cancel out: a parry */
-  parryRadius: 3,
+  /** your bullet cancels a red bullet that was already in flight when you fired, if they pass this close */
+  parryRadius: 2,
   bulletRadius: 1,
   thrownRadius: 3,
   /** a thrown item that hits a red stuns it this long (brutes and bosses shrug most of it off); punches
    *  landed meanwhile keep it stunned, so a throw followed by fists is a stun kill */
   throwStun: 1.6,
   bruteThrowStun: 0.4,
-  /** an armed red hit by a throw or a punch drops its weapon this far toward you */
-  disarmDrop: 6,
+  /** an armed red hit by a throw or a punch drops its weapon this far toward you, and may not pick
+   *  anything up for `regrab` game s */
+  disarmDrop: 18,
+  regrab: 0.8,
 };
 
 /** Frameskip (GAME_DESIGN §12): an instant dash toward the aim. Indexed by tier (0 = locked). */
@@ -83,7 +87,7 @@ export const COINS = {
   comboWindow: 1.0,
   stunKill: 2,
   throwKill: 2,
-  parry: 3,
+  parry: 2,
   ricochet: 3,
   frameskip: 2,
   clear: 5,
